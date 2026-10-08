@@ -2,7 +2,6 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Models\DocumentTemplate;
 use Illuminate\Support\Str;
 use PhpOffice\PhpWord\TemplateProcessor;
 
@@ -58,53 +57,6 @@ class DocumentGenerator
 
         @unlink($tempPath);
         return $templatePath;
-    }
-
-    public static function generateFromTemplate(
-        DocumentTemplate $template,
-        Customer $customer,
-        array $extraValues = [],
-        ?string $outputFilename = null
-    ) {
-        $templatePath = public_path('document_templates/' . $template->file_path);
-
-        if (!file_exists($templatePath)) {
-            abort(404, 'File template tidak ditemukan: ' . $template->file_path);
-        }
-
-        $convertedPath = self::convertPlaceholders($templatePath);
-
-        try {
-            $context = DocumentDataContext::getAllForCustomer($customer);
-            $context = array_merge($context, $extraValues);
-
-            $templateProcessor = new TemplateProcessor($convertedPath);
-
-            $flattened = [];
-            foreach ($context as $key => $value) {
-                if (is_string($value) || is_numeric($value) || is_null($value)) {
-                    $flattened[$key] = (string) ($value ?? '-');
-                }
-            }
-            $templateProcessor->setValues($flattened);
-
-            $filename = $outputFilename
-                ?? $template->kode . '_' . $customer->kode_customer . '.docx';
-
-            $tempFile = tempnam(sys_get_temp_dir(), 'docgen_');
-            $templateProcessor->saveAs($tempFile);
-
-            if ($convertedPath !== $templatePath) {
-                @unlink($convertedPath);
-            }
-
-            return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
-        } catch (\Exception $e) {
-            if ($convertedPath !== $templatePath) {
-                @unlink($convertedPath);
-            }
-            throw $e;
-        }
     }
 
     public static function generateDocx(

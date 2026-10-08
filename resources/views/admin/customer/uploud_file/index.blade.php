@@ -110,6 +110,18 @@
                     @csrf
                     <div class="modal-body p-4">
                         <div class="form-group row">
+                            <label class="col-sm-3 col-form-label" for="jenis_berkas_id">Jenis Berkas Legal</label>
+                            <div class="col-sm-8">
+                                <select name="jenis_berkas_id" id="jenis_berkas_id" class="form-control">
+                                    <option value="">Berkas customer biasa</option>
+                                    @foreach ($jenisBerkas as $jenis)
+                                        <option value="{{ $jenis->id }}">{{ $jenis->nama }}</option>
+                                    @endforeach
+                                </select>
+                                <small class="text-muted">Pilih jenis legal agar berkas langsung masuk ke Pengajuan Berkas. Maksimal 10 MB untuk berkas legal.</small>
+                            </div>
+                        </div>
+                        <div class="form-group row">
                             <label class="col-sm-3 col-form-label">Nama Berkas</label>
                             <div class="col-sm-8">
                                 <input type="text" name="nama_file" id="nama_file" class="form-control">
@@ -264,11 +276,11 @@
                             data: 'lampiran',
                             name: 'lampiran',
                             render: function(data, type, row) {
-                                let url = "{{ asset('assets/customer') }}/" + data;
-                                return `
-                            <button class="btn btn-info btn-sm lihat-lampiran" data-src="${url}" data-title="${row.nama_file}">View</button>
-                            <a href="${url}" download class="btn btn-success btn-sm ml-2">Download</a>
-                        `;
+                                let url = row.file_url || "{{ asset('assets/customer') }}/" + data;
+                                const controls = $('<div>');
+                                controls.append($('<button type="button" class="btn btn-info btn-sm lihat-lampiran">').text('View').attr('data-src', url).attr('data-filename', data));
+                                controls.append($('<a class="btn btn-success btn-sm ml-2" download>').text('Download').attr('href', url));
+                                return controls.html();
                             }
                         },
                         {
@@ -360,7 +372,7 @@
 
             $(document).on('click', '.lihat-lampiran', function() {
                 let src = $(this).data('src');
-                let ext = src.split('.').pop().toLowerCase();
+                let ext = String($(this).data('filename') || src).split('.').pop().toLowerCase();
                 let content = ext === 'pdf' ?
                     `<iframe src="${src}" width="100%" height="600px"></iframe>` :
                     `<img src="${src}" alt="Lampiran" class="img-fluid rounded shadow">`;

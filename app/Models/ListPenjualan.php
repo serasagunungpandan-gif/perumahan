@@ -20,6 +20,11 @@ class ListPenjualan extends Model
         'stt_tampil',
     ];
 
+    public function scopeForColorSettings($query)
+    {
+        return $query->whereRaw('LOWER(TRIM(status_progres)) NOT IN (?, ?)', ['user cancel', 'serah terima']);
+    }
+
     public $timestamps = false;
 
 }

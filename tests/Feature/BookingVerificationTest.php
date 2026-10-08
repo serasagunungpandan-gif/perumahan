@@ -184,6 +184,7 @@ class BookingVerificationTest extends TestCase
     {
         $this->assertFalse(Schema::hasColumn('kavling_peta', 'status'));
         $this->assertTrue(\App\Models\KavlingPeta::withBookingState()->findOrFail(1)->is_booked);
+        $this->assertSame('Hold', \App\Models\KavlingPeta::withBookingState()->findOrFail(1)->sales_status);
         DB::table('pengajuan_hold')->where('id', 1)->update(['stt_reg' => 3]);
         $this->assertFalse(\App\Models\KavlingPeta::withBookingState()->findOrFail(1)->is_booked);
         $this->assertTrue(\App\Models\KavlingPeta::whereKey(1)->available()->exists());

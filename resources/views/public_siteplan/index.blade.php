@@ -339,18 +339,11 @@
 
                                         @foreach ($kav->kavlingPeta as $pt)
                                             @php
-                                                $allowedStatus = ['Ready', 'Booking Fee', 'Serah Terima'];
-
                                                 $warna = '#ffffff';
-
-                                                if ($pt->customer && $pt->customer->progres) {
-                                                    $status = $pt->customer->progres->status_progres;
-
-                                                    if (in_array($status, $allowedStatus)) {
-                                                        $warna = $pt->customer->progres->warna ?? '#ffffff';
-                                                    }
+                                                if ($pt->customer) {
+                                                    $warna = $pt->customer->progres->warna ?? '#ffffff';
                                                 } elseif ($pt->is_booked) {
-                                                    $warna = '#42f202';
+                                                    $warna = $holdColor;
                                                 }
                                             @endphp
 
@@ -383,19 +376,9 @@
     <div class="legend-title">Keterangan Status</div>
 
         @foreach ($legend as $item)
-            @php
-                $label = $item->status_progres;
-
-                if ($label == 'Booking Fee') {
-                    $label = 'Booking';
-                } elseif ($label == 'Serah Terima') {
-                    $label = 'Terjual';
-                }
-            @endphp
-
             <div class="legend-item">
                 <div class="legend-color" style="background-color: {{ $item->warna }}"></div>
-                <div class="legend-label">{{ $label }}</div>
+                <div class="legend-label">{{ $item->status_progres }}</div>
             </div>
         @endforeach
 

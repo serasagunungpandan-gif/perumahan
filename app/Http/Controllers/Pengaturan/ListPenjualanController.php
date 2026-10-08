@@ -19,7 +19,8 @@ class ListPenjualanController extends Controller
         $permissions = HakAksesController::getUserPermissions();
 
         if ($request->ajax()) {
-            $data = ListPenjualan::orderBy('urutan', 'asc');
+            $data = ListPenjualan::forColorSettings()
+                ->orderBy('urutan', 'asc');
 
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -62,7 +63,8 @@ class ListPenjualanController extends Controller
 
     public function edit($id)
     {
-        $list = ListPenjualan::findOrFail($id);
+        $list = ListPenjualan::forColorSettings()
+            ->findOrFail($id);
 
         return response()->json([
             'status' => 'success',
@@ -117,7 +119,8 @@ class ListPenjualanController extends Controller
 
     public function update(Request $request, $id)
     {
-        $data = ListPenjualan::findOrFail($id);
+        $data = ListPenjualan::forColorSettings()
+            ->findOrFail($id);
 
         $request->validate([
             'status_progres' => 'required',

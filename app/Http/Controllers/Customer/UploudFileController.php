@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Customer;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pengaturan\HakAksesController;
 use App\Models\Customer;
+use App\Models\JenisBerkas;
+use App\Models\PersyaratanLegal;
+use App\Http\Controllers\Legal\BerkasPengajuanController;
 use App\Models\UploudFile;
 use App\Traits\LogAktivitasTrait;
 use Carbon\Carbon;
@@ -21,7 +24,8 @@ class UploudFileController extends Controller
         $permissions = HakAksesController::getUserPermissions();
         $customer    = Customer::where('stt_arsip', 0)->get();
 
-        return view('admin.customer.uploud_file.index', compact('data', 'permissions', 'customer'));
+        $jenisBerkas = JenisBerkas::where('aktif', 1)->orderBy('urutan')->orderBy('nama')->get();
+        return view('admin.customer.uploud_file.index', compact('data', 'permissions', 'customer', 'jenisBerkas'));
     }
     
     public function edit(Request $request, $id)
@@ -36,10 +40,19 @@ class UploudFileController extends Controller
         }
 
         if ($request->ajax() && $request->get('type') === 'files') {
-            $data = UploudFile::where('id_customer', $id)->orderBy('id', 'desc');
-
-            if ($data->count() === 0) {
-                return response()->json(['data' => []]);
+            $data = UploudFile::where('id_customer', $id)->orderBy('id', 'desc')->get();
+            foreach ($data as $file) $file->file_url = asset('assets/customer/' . $file->lampiran);
+            $jenis = JenisBerkas::pluck('nama', 'id');
+            foreach (PersyaratanLegal::where('id_customer', $id)->get() as $legal) {
+                foreach ($legal->file_jenis_berkas ?? [] as $jenisId => $file) {
+                    $data->push((object) [
+                        'id' => 'legal-' . $legal->id . '-' . $jenisId,
+                        'nama_file' => ($jenis[$jenisId] ?? 'Berkas') . ' (Legal)',
+                        'lampiran' => $file['name'],
+                        'file_url' => route('pengajuan-berkas.file', [$legal->id, $jenisId]),
+                        'delete_url' => route('pengajuan-berkas.delete-file', [$legal->id, $jenisId]),
+                    ]);
+                }
             }
 
             return DataTables::of($data)
@@ -48,7 +61,7 @@ class UploudFileController extends Controller
                     return $row->lampiran;
                 })
                 ->addColumn('action', function ($row) {
-                    $deleteUrl = route('upload-file.destroy', $row->id);
+                    $deleteUrl = $row->delete_url ?? route('upload-file.destroy', $row->id);
 
                     $btn = '<div class="d-flex justify-content-center">';
                     $btn .= '<form action="' . e($deleteUrl) . '" method="POST" style="display:inline;">'
@@ -73,6 +86,21 @@ class UploudFileController extends Controller
 
     public function update(Request $request, $id)
     {
+        Customer::findOrFail($id);
+        if ($request->filled('jenis_berkas_id')) {
+            $request->validate(['jenis_berkas_id' => 'required|exists:jenis_berkas,id', 'lampiran' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240']);
+            $legal = PersyaratanLegal::firstOrCreate(['id_customer' => $id]);
+            $statuses = [];
+            foreach (JenisBerkas::where('aktif', 1)->pluck('id') as $jenisId) $statuses[$jenisId] = ($legal->status_jenis_berkas ?? [])[$jenisId] ?? 0;
+            $forward = Request::create('/', 'PUT', ['status_berkas' => $statuses, 'catatan_kekurangan' => $legal->catatan_kekurangan]);
+            $forward->files->set('file_berkas', [$request->jenis_berkas_id => $request->file('lampiran')]);
+            try {
+                return app(BerkasPengajuanController::class)->update($forward, $legal->id);
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['lampiran' => collect($e->errors())->flatten()->all()]);
+            }
+        }
+
         $rules = [
             'nama_file' => 'required',
             'lampiran'  => 'required|mimes:jpg,jpeg,png,pdf|max:2048',

@@ -88,7 +88,7 @@ class KavlingPeta extends Model
     {
         return $this->customer
             ? ($this->customer->progres->status_progres ?? 'Terjual')
-            : ($this->is_booked ? 'Booking' : 'Tersedia');
+            : ($this->is_booked ? 'Hold' : 'Tersedia');
     }
     public function progres()
     {

@@ -25,22 +25,15 @@ class SiteplanPenjualanController extends Controller
         'kavlingPeta' => fn ($query) => $query->withBookingState(), 'kavlingPeta.customer.progres'  // ← tambahkan ini
     ])->orderBy('urutan', 'asc')->get();
 
-        $legend = ProgresListPenjualan::whereNotNull('warna')
+        $legend = ProgresListPenjualan::forColorSettings()->whereNotNull('warna')
             ->where('warna', '!=', '')
             ->where('stt_tampil', 1)
             ->orderBy('urutan', 'asc')
             ->get();
 
-        $manual = collect([
-            (object) [
-                'status_progres' => 'Booking',
-                'warna'          => '#42f202',
-            ],
-        ]);
+        $holdColor = ProgresListPenjualan::whereRaw('LOWER(TRIM(status_progres)) = ?', ['hold'])->value('warna') ?: '#ffc107';
 
-        $legend = $manual->merge($legend);
-
-        return view('admin.siteplan.siteplan_penjualan.index', compact('lokasiKavling', 'legend'));
+        return view('admin.siteplan.siteplan_penjualan.index', compact('lokasiKavling', 'legend', 'holdColor'));
     }
 
 
@@ -76,13 +69,15 @@ class SiteplanPenjualanController extends Controller
 
         echo str_replace(['[[lebar]]', '[[tinggi]]'], [$width, $height], $lokasi->masterSvg->header_svg);
 
+        $holdColor = ProgresListPenjualan::whereRaw('LOWER(TRIM(status_progres)) = ?', ['hold'])->value('warna') ?: '#ffc107';
+
         foreach ($lokasi->kavlingPeta as $pt) {
             $warna = '#ffffff';
 
             if ($pt->customer) {
                 $warna = $pt->customer->progres->warna ?? '#ffffff';
             } elseif ($pt->is_booked) {
-                $warna = '#42f202';
+                $warna = $holdColor;
             }
 
             $replacements = [$pt->map, $warna, $pt->matrik, $pt->kode_kavling];

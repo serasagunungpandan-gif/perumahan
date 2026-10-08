@@ -22,16 +22,17 @@ class PublicSiteplanController extends Controller
             ->orderBy('urutan', 'asc')
             ->get();
 
-        $legend = ProgresListPenjualan::whereNotNull('warna')
+        $legend = ProgresListPenjualan::forColorSettings()->whereNotNull('warna')
             ->where('warna', '!=', '')
             ->where('stt_tampil', 1)
-            ->whereIn('status_progres', ['Ready', 'Booking Fee', 'Serah Terima'])
             ->orderBy('urutan', 'asc')
             ->get();
 
             $bg        = PengaturanMedia::where('jenis_data', 'Background booking')->first();
 
-        return view('public_siteplan.index', compact('lokasiKavling', 'legend', 'bg'));
+        $holdColor = ProgresListPenjualan::whereRaw('LOWER(TRIM(status_progres)) = ?', ['hold'])->value('warna') ?: '#ffc107';
+
+        return view('public_siteplan.index', compact('lokasiKavling', 'legend', 'bg', 'holdColor'));
     }
 
     /**

@@ -18,7 +18,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\DocumentTemplate;
 use App\Services\DocumentDataContext;
 use App\Services\DocumentGenerator;
 use Yajra\DataTables\Facades\DataTables;
@@ -674,23 +673,9 @@ class CustomerController extends Controller
         );
     }
 
-    public function printDocument($templateCode, $idCustomer)
-    {
-        $template = DocumentTemplate::where('kode', $templateCode)->where('is_active', true)->firstOrFail();
-
-        $customer = Customer::with(['kavlingPeta.lokasi', 'kavlingPeta.perusahaan', 'lokasiKavling'])
-            ->findOrFail($idCustomer);
-
-        return DocumentGenerator::generateFromTemplate(
-            template: $template,
-            customer: $customer
-        );
-    }
-
     public function getTempo(Request $request)
     {
         Carbon::setLocale('id');
-        $docTemplates = DocumentTemplate::where('is_active', true)->get(['kode', 'nama']);
 
         if ($request->ajax()) {
             $data = CustomerTempo::with([
@@ -751,22 +736,12 @@ class CustomerController extends Controller
                     $ktp  = $row->nik ? '<span class="badge bg-info">NIK: ' . $row->nik . '</span>' : '';
                     return "$nama<br>$wa<br>$ktp";
                 })
-                ->addColumn('action', function ($row) use ($docTemplates): string {
+                ->addColumn('action', function ($row): string {
                     $editUrl   = route('customer.show-tempo', $row->id);
                     $uploadUrl = route('upload-file.index', ['id_customer' => $row->id]);
                     $btn       = '<div class="text-center">';
 
                     $btn .= '<button class="btn btn-primary btn-sm edit-button" data-id="' . e($row->id) . '" data-url="' . e($editUrl) . '">Detail</button> ';
-
-                    $documents = $docTemplates->map(fn($t) => [
-                        'name' => $t->nama,
-                        'route' => route('customer.print-document', [$t->kode, $row->id]),
-                        'checked' => true,
-                    ])->values()->toJson();
-                    $btn .= '<button class="btn btn-dark btn-sm btn-cetak-item ml-1"
-                                    data-id="' . $row->id . '"
-                                    data-nama="' . e($row->nama_lengkap) . '"
-                                    data-documents=\'' . $documents . '\'>Cetak</button>';
 
                     $btn .= '</div>';
                     return $btn;

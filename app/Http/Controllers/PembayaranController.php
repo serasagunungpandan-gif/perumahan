@@ -768,9 +768,9 @@ class PembayaranController extends Controller
                 ->addColumn('jumlah_tagihan', function ($row) {
                     return '<div class="input-group input-group-sm" style="max-width:200px; margin-left:auto;">
                         <div class="input-group-prepend"><span class="input-group-text">Rp.</span></div>
-                        <input type="text" class="form-control format-number edit-nominal text-right" value="' . number_format($row->nominal, 0, ',', '.') . '" data-id="' . $row->id . '">
+                        <input type="text" class="form-control format-number edit-nominal text-right" aria-label="Nominal tagihan" value="' . number_format($row->nominal, 0, ',', '.') . '" data-id="' . $row->id . '">
                         <div class="input-group-append">
-                            <button type="button" class="btn btn-success btn-sm save-nominal" data-id="' . $row->id . '"><i class="fa fa-check"></i></button>
+                            <button type="button" class="btn btn-success btn-sm save-nominal" title="Simpan nominal tagihan" aria-label="Simpan nominal tagihan" data-id="' . $row->id . '"><i class="fa fa-check"></i></button>
                         </div>
                     </div>';
                 })
@@ -968,6 +968,7 @@ class PembayaranController extends Controller
             $data = Pemasukan::with('kategori')
                 ->where('id_customer', $id)
                 ->where('keterangan', 'NOT LIKE', 'Biaya ganti nama%')
+                ->orderByDesc('tanggal')->orderByDesc('id')
                 ->get();
 
             foreach ($data as $item) {

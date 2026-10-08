@@ -26,7 +26,6 @@ use App\Http\Controllers\Master\LokasiKavlingController;
 use App\Http\Controllers\Master\NotarisController;
 use App\Http\Controllers\Master\PerusahaanController;
 use App\Http\Controllers\Master\RetensiController;
-use App\Http\Controllers\Master\UploadTemplateController;
 use App\Http\Controllers\PanduanAplikasiController;
 use App\Http\Controllers\PembayaranController;
 use App\Http\Controllers\PengajuanHoldController;
@@ -249,7 +248,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('customer/cetak', [CustomerController::class, 'cetakData'])->name('customer.cetak');
         Route::get('customer/{id_customer}/cetak-pdf', [CustomerController::class, 'cetakDetail'])->name('customer.cetak-detail');
         Route::get('customer/{id_customer}/subsidi-cetak', [CustomerController::class, 'cetakFormSubsidi'])->name('subsidi.cetak');
-        Route::get('customer/print-document/{template_code}/{id_customer}', [CustomerController::class, 'printDocument'])->name('customer.print-document');
 
         Route::get('customer/tempo', [CustomerController::class, 'getTempo'])->name('customer.tempo');
         Route::get('customer/tempo/{id}', [CustomerController::class, 'showTempo'])->name('customer.show-tempo');
@@ -267,6 +265,9 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('admin/legal')->group(function () {
         Route::resource('bphtb-ssp', BphtbSSPController::class);
         Route::resource('listrik-air', ListrikAirController::class);
+        Route::get('pengajuan-berkas/{id}/print', [BerkasPengajuanController::class, 'print'])->name('pengajuan-berkas.print');
+        Route::delete('pengajuan-berkas/{id}/file/{jenis}', [BerkasPengajuanController::class, 'deleteFile'])->name('pengajuan-berkas.delete-file');
+        Route::get('pengajuan-berkas/{id}/file/{jenis}', [BerkasPengajuanController::class, 'file'])->name('pengajuan-berkas.file');
         Route::resource('pengajuan-berkas', BerkasPengajuanController::class);
     });
 
@@ -315,7 +316,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('bank/data/list', [BankTransaksiController::class, 'getBankList'])->name('bank.list');
         Route::resource('retensi', RetensiController::class);
         Route::resource('notaris', NotarisController::class);
-        Route::resource('upload-template', UploadTemplateController::class);
         Route::resource('jenis-berkas', JenisBerkasController::class)->only(['index', 'store', 'edit', 'update', 'destroy']);
     });
 

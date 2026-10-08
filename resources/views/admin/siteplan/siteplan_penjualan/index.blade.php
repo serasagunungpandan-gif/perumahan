@@ -140,7 +140,7 @@
                                                             $warna = $pt->customer->progres->warna ?? '#ffffff';
                                                         } else {
                                                             if ($pt->is_booked) {
-                                                                $warna = '#42f202';
+                                                                $warna = $holdColor;
                                                             }
                                                         }
                                                     @endphp

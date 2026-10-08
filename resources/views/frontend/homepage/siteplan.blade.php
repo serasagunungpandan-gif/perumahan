@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta http-equiv="x-ua-compatible" content="ie=edge">
         @php
+        $holdColor = \App\Models\ProgresListPenjualan::whereRaw('LOWER(TRIM(status_progres)) = ?', ['hold'])->value('warna') ?: '#ffc107';
         $konfigurasi = \App\Models\PengaturanProfil::first();
         @endphp
 
@@ -81,7 +82,7 @@
                                 }
                             } else {
                                 if ($pt->is_booked) {
-                                    $warna = '#42f202';
+                                    $warna = $holdColor;
                                 }
                             }
                         @endphp
@@ -176,7 +177,8 @@
             <div class="row">
                 <div class="col-12">
                     @php
-                    $konfigurasi = \App\Models\PengaturanProfil::first();
+                    $holdColor = \App\Models\ProgresListPenjualan::whereRaw('LOWER(TRIM(status_progres)) = ?', ['hold'])->value('warna') ?: '#ffc107';
+        $konfigurasi = \App\Models\PengaturanProfil::first();
                     @endphp
                     <div class="copyright-text text-center">
                         <p>&copy; 2025 {{ $konfigurasi->nama_perusahaan ?? 'Template Aplikasi' }}</p>
