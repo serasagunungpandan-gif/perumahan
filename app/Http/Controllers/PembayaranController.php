@@ -158,9 +158,6 @@ class PembayaranController extends Controller
             $perusahaan   = $perusahaanId ? Perusahaan::find($perusahaanId) : null;
         }
 
-        $profilPerusahaan = PengaturanProfil::first();
-        $namaProfil       = $profilPerusahaan->nama_perusahaan ?? 'PT. ALAM INDAH SELALU';
-        $telpProfil       = $profilPerusahaan->telp ?? '0778-4173387';
         $kopPath          = public_path('assets/img/kop-surat-rekap.jpg');
         $footerPath       = public_path('assets/img/foot-surat-rekap.jpg');
 

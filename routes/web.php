@@ -122,6 +122,10 @@ Route::get('/hutang/sisa-bayar/{id}', [HutangController::class, 'getSisaBayar'])
 Route::get('/piutang/sisa-bayar/{id}', [PiutangController::class, 'getSisaBayar']);
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('admin/laporan', [\App\Http\Controllers\LaporanController::class, 'index'])->name('laporan.index');
+    Route::get('admin/laporan/detail', [\App\Http\Controllers\LaporanController::class, 'detail'])->name('laporan.detail');
+    Route::get('admin/laporan/excel', [\App\Http\Controllers\LaporanController::class, 'excel'])->name('laporan.excel');
+
     Route::get('admin/beranda', [BerandaController::class, 'index'])->name('beranda.index');
 
     Route::prefix('admin')->controller(DashboardController::class)->group(function () {
