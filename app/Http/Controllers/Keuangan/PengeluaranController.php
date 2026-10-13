@@ -129,11 +129,10 @@ class PengeluaranController extends Controller
         }
 
         $kategoriTransaksi = KategoriTransaksi::where('jenis_kategori', 'PENGELUARAN')
-            ->whereNotIn('id', [8, 9, 11, 13, 14, 15, 16, 18])
+            ->orderBy('id')
             ->get();
 
-        $kategoriTransaksiDetail = KategoriTransaksi::where('jenis_kategori', 'PENGELUARAN')
-            ->get();
+        $kategoriTransaksiDetail = $kategoriTransaksi;
 
         $HutangList = Hutang::where('status', 1)->get();
 

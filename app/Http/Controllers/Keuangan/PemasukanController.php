@@ -118,11 +118,10 @@ class PemasukanController extends Controller
         }
 
         $kategoriTransaksi = KategoriTransaksi::where('jenis_kategori', 'PEMASUKAN')
-            ->whereNotIn('id', [1, 2, 3, 4, 5, 6, 7, 17, 19, 20])
+            ->orderBy('id')
             ->get();
 
-        $kategoriTransaksiDetail = KategoriTransaksi::where('jenis_kategori', 'PEMASUKAN')
-            ->get();
+        $kategoriTransaksiDetail = $kategoriTransaksi;
 
         $PiutangList = Piutang::where('status', 1)->where('id_customer', 0)->get();
 

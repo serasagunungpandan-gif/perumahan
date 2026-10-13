@@ -21,6 +21,16 @@ class PiutangPaymentTest extends TestCase
         Schema::create('customer', function (Blueprint $table) {
             $table->id();
             $table->string('nama_lengkap');
+            $table->integer('id_lokasi')->nullable();
+            $table->integer('id_kavling')->nullable();
+        });
+        Schema::create('lokasi_kavling', function (Blueprint $table) {
+            $table->id();
+            $table->string('nama_kavling');
+        });
+        Schema::create('kavling_peta', function (Blueprint $table) {
+            $table->id();
+            $table->string('kode_kavling');
         });
         Schema::create('piutang', function (Blueprint $table) {
             $table->id();
@@ -74,7 +84,7 @@ class PiutangPaymentTest extends TestCase
         $this->assertDatabaseHas('piutang', ['id' => $first->id, 'terbayar' => 0, 'sisa_bayar' => 100, 'status' => 1, 'tgl_pelunasan' => null]);
     }
 
-    public function test_detail_contains_only_allocations_for_selected_bill(): void
+    public function test_detail_combines_customer_bills_and_counts_each_payment_once(): void
     {
         $first = $this->bill(100);
         $second = $this->bill(200);
@@ -84,15 +94,51 @@ class PiutangPaymentTest extends TestCase
         $this->pay(999, ['keterangan' => 'Biaya ganti nama customer']);
         $response = app(PiutangController::class)->show($second->id)->getData(true);
         $this->assertSame('Customer Test', $response['customer']);
-        $this->assertEquals(90, $response['data']['terbayar']);
+        $this->assertEquals(300, $response['data']['nominal']);
+        $this->assertEquals(190, $response['data']['terbayar']);
         $this->assertEquals(110, $response['data']['sisa_bayar']);
+        $this->assertCount(2, $response['components']);
+        $components = array_column($response['components'], null, 'id');
+        $this->assertSame(100, $components[$first->id]['nominal']);
+        $this->assertSame(100, $components[$first->id]['terbayar']);
+        $this->assertSame(200, $components[$second->id]['nominal']);
+        $this->assertSame(90, $components[$second->id]['terbayar']);
+        $this->assertSame(110, $components[$second->id]['sisa_bayar']);
+        $this->assertSame((int) $response['data']['nominal'], array_sum(array_column($response['components'], 'nominal')));
         $this->assertCount(2, $response['payments']);
         $amounts = array_column($response['payments'], 'nominal', 'id');
-        $this->assertSame(50, $amounts[$general->id]);
+        $this->assertSame(150, $amounts[$general->id]);
         $this->assertSame(40, $amounts[$linked->id]);
         $response = app(PiutangController::class)->show($first->id)->getData(true);
-        $this->assertCount(1, $response['payments']);
-        $this->assertSame(100, $response['payments'][0]['nominal']);
+        $this->assertCount(2, $response['payments']);
+        $this->assertSame(150, $response['payments'][0]['nominal']);
+    }
+
+    public function test_unit_rows_combine_components_but_keep_other_units_and_manual_bills_separate(): void
+    {
+        DB::table('lokasi_kavling')->insert(['id' => 1, 'nama_kavling' => 'Lokasi A']);
+        DB::table('kavling_peta')->insert(['id' => 1, 'kode_kavling' => 'A-01']);
+        DB::table('customer')->where('id', 1)->update(['id_lokasi' => 1, 'id_kavling' => 1]);
+        DB::table('customer')->insert([
+            ['id' => 2, 'nama_lengkap' => 'Same unit', 'id_lokasi' => 1, 'id_kavling' => 1],
+            ['id' => 3, 'nama_lengkap' => 'Other location', 'id_lokasi' => 2, 'id_kavling' => 1],
+        ]);
+        $this->bill(100);
+        $this->bill(200);
+        $this->bill(50, 2);
+        $this->bill(70, 3);
+        $this->bill(20, 0);
+        $this->bill(30, 0);
+        $this->pay(150);
+        $rows = app(\App\Services\PiutangUnitService::class)->rows();
+        $this->assertCount(4, $rows);
+        $unit = $rows->firstWhere('id_customer', 1);
+        $this->assertEquals(350, $unit->nominal);
+        $this->assertEquals(150, $unit->terbayar);
+        $this->assertEquals(200, $unit->sisa_bayar);
+        $this->assertEquals(350, $unit->getRawOriginal('nominal'));
+        $this->assertStringContainsString('Lokasi A / A-01', $unit->deskripsi);
+        $this->assertArrayNotHasKey('customer', $unit->toArray());
     }
 
     public function test_linked_payment_move_and_manual_receivable_edit_recalculate(): void

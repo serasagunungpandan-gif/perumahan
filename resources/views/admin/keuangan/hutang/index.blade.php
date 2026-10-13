@@ -168,6 +168,33 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="modalBayarHutang" tabindex="-1" role="dialog" aria-labelledby="bayarHutangLabel" aria-hidden="true" data-backdrop="static">
+        <div class="modal-dialog modal-lg" role="document"><div class="modal-content">
+            <div class="modal-header bg-indigo">
+                <h5 id="bayarHutangLabel" class="modal-title text-white">Bayar Hutang</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Tutup"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <form id="formBayarHutang" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-body">
+                    <div id="bayar-hutang-info" class="alert alert-info"></div>
+                    <div id="bayar-hutang-errors" class="alert alert-danger d-none" role="alert"></div>
+                    <div class="row">
+                        <div class="form-group col-md-6"><label for="bayar-tanggal">Tanggal Bayar</label><input id="bayar-tanggal" type="date" name="tanggal" class="form-control" value="{{ now()->toDateString() }}" required></div>
+                        <div class="form-group col-md-6"><label for="bayar-nominal">Nominal Bayar (Rp)</label><input id="bayar-nominal" name="nominal" class="form-control format-number" inputmode="numeric" required><small class="text-muted">Bisa bayar sebagian atau lunas.</small></div>
+                        <div class="form-group col-md-6"><label for="bayar-bank">Rekening</label><select id="bayar-bank" name="id_bank" class="form-control" required><option value="">Pilih Rekening</option>@foreach ($bankList as $bank)<option value="{{ $bank->id }}">{{ $bank->nama }}</option>@endforeach</select></div>
+                        <div class="form-group col-md-6"><label for="bayar-metode">Metode Bayar</label><select id="bayar-metode" name="id_metode_bayar" class="form-control" required><option value="">Pilih Metode Bayar</option>@foreach ($metodeBayarList as $metode)<option value="{{ $metode->id }}">{{ $metode->jenis_bayar }}</option>@endforeach</select></div>
+                        <div class="form-group col-md-6"><label for="bayar-no">No. Tanda Terima</label><input id="bayar-no" name="no_tanda_terima" class="form-control" maxlength="100" required></div>
+                        <div class="form-group col-md-6"><label for="bayar-pemberi">Pemberi/Penyetor</label><input id="bayar-pemberi" name="diterima_dari" class="form-control" maxlength="255" required></div>
+                        <div class="form-group col-md-6"><label for="bayar-penerima">Nama Penerima</label><input id="bayar-penerima" name="nama_penerima" class="form-control" maxlength="255" required></div>
+                        <div class="form-group col-md-6"><label for="bayar-lampiran">Bukti Pembayaran</label><input id="bayar-lampiran" type="file" name="lampiran" class="form-control" accept=".jpg,.jpeg,.png,.pdf" required><small class="text-muted">JPG, PNG, atau PDF; maksimal 2 MB.</small></div>
+                        <div class="form-group col-12"><label for="bayar-keterangan">Keterangan</label><textarea id="bayar-keterangan" name="keterangan" class="form-control" rows="2"></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button><button type="submit" class="btn btn-success">Simpan Pembayaran</button></div>
+            </form>
+        </div></div>
+    </div>
 @endsection
 @push('scripts')
     <script>
@@ -189,7 +216,48 @@
         });
 
         var permissions = @json($permissions);
-        var showActionColumn = (permissions['edit'] == 1 || permissions['hapus'] == 1);
+        var showActionColumn = (permissions['tambah'] == 1 || permissions['edit'] == 1 || permissions['hapus'] == 1);
+
+        $(document).on('click', '.bayar-hutang', function() {
+            const button = $(this).prop('disabled', true);
+            const form = $('#formBayarHutang');
+            form[0].reset();
+            $('#bayar-hutang-errors').addClass('d-none').empty();
+            form.attr('action', button.data('url'));
+            $.get(button.data('detail-url'), function(response) {
+                const debt = response.data;
+                $('#bayar-hutang-info').text(debt.deskripsi + ' — Sisa hutang: Rp ' + Number(debt.sisa_bayar).toLocaleString('id-ID'));
+                $('#bayar-nominal').val(Number(debt.sisa_bayar).toLocaleString('id-ID'));
+                $('#bayar-keterangan').val('Pembayaran hutang: ' + debt.deskripsi);
+                $('#modalBayarHutang').modal('show');
+            }).fail(function() { toastr.error('Gagal memuat hutang.'); })
+                .always(function() { button.prop('disabled', false); });
+        });
+
+        $('#formBayarHutang').on('submit', function(event) {
+            event.preventDefault();
+            const form = $(this);
+            const button = form.find('[type="submit"]').prop('disabled', true).text('Menyimpan...');
+            const errors = $('#bayar-hutang-errors').addClass('d-none').empty();
+            $.ajax({
+                url: form.attr('action'), method: 'POST', data: new FormData(this),
+                processData: false, contentType: false,
+                success: function() {
+                    $('#modalBayarHutang').modal('hide');
+                    toastr.success('Pembayaran hutang berhasil disimpan.');
+                    reloadTable();
+                },
+                error: function(xhr) {
+                    errors.removeClass('d-none');
+                    if (xhr.status === 422 && xhr.responseJSON.errors) {
+                        Object.values(xhr.responseJSON.errors).flat().forEach(function(message) {
+                            errors.append($('<div>').text(message));
+                        });
+                    } else errors.text('Gagal menyimpan pembayaran hutang. Silakan coba kembali.');
+                },
+                complete: function() { button.prop('disabled', false).text('Simpan Pembayaran'); }
+            });
+        });
 
         function reloadTable() {
             $('.data-table').DataTable().ajax.reload();

@@ -283,6 +283,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('pemasukan', PemasukanController::class);
         Route::get('pengeluaran/{id}/cetak', [PengeluaranController::class, 'cetak'])->name('pengeluaran.cetak');
         Route::resource('pengeluaran', PengeluaranController::class);
+        Route::post('hutang/{id}/bayar', [HutangController::class, 'bayar'])->name('hutang.bayar');
         Route::resource('hutang', HutangController::class);
         Route::resource('piutang', PiutangController::class);
         Route::resource('kategori-transaksi', KategoriTransaksiController::class);

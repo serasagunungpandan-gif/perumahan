@@ -258,6 +258,35 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="modalRincianPiutang" tabindex="-1" role="dialog"
+        aria-labelledby="modalRincianPiutangLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-indigo">
+                    <div>
+                        <h5 class="modal-title text-white" id="modalRincianPiutangLabel">Rincian Piutang</h5>
+                        <div id="identitas-rincian-piutang" class="small text-white mt-1"></div>
+                    </div>
+                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Tutup"><span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-sm">
+                            <thead><tr><th>No</th><th>Tanggal</th><th>Deskripsi Tagihan</th>
+                                <th class="text-right">Nominal</th><th class="text-right">Terbayar</th>
+                                <th class="text-right">Sisa Bayar</th><th>Status</th></tr></thead>
+                            <tbody id="rincian-piutang-body"></tbody>
+                            <tfoot><tr class="font-weight-bold"><td colspan="3">Total</td>
+                                <td id="rincian-total-nominal" class="text-right text-nowrap"></td>
+                                <td id="rincian-total-terbayar" class="text-right text-nowrap"></td>
+                                <td id="rincian-total-sisa" class="text-right text-nowrap"></td><td></td></tr></tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button></div>
+            </div>
+        </div>
+    </div>
 @endsection
 @push('scripts')
     <script>
@@ -405,6 +434,36 @@
 
                     $('#modalForm').modal('show');
                 }
+            });
+        });
+
+        $(document).on('click', '.rincian-button', function() {
+            const button = $(this).prop('disabled', true);
+            $.get(button.data('url'), function(response) {
+                if (response.status !== 'success') return;
+                const body = $('#rincian-piutang-body').empty();
+                const money = value => 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+                $('#identitas-rincian-piutang').text(response.data.deskripsi);
+                (response.components || []).forEach(function(bill, index) {
+                    const row = $('<tr>');
+                    [index + 1, String(bill.tanggal_piutang || '').slice(0, 10), bill.deskripsi || '-',
+                        money(bill.nominal), money(bill.terbayar), money(bill.sisa_bayar),
+                        Number(bill.status) === 2 ? 'Sudah Lunas' : 'Belum Lunas'].forEach(function(value, column) {
+                        row.append($('<td>').toggleClass('text-right text-nowrap', column >= 3 && column <= 5).text(value));
+                    });
+                    body.append(row);
+                });
+                if (!response.components || !response.components.length) {
+                    body.append($('<tr>').append($('<td>', { colspan: 7, class: 'text-center text-muted' }).text('Belum ada rincian piutang.')));
+                }
+                $('#rincian-total-nominal').text(money(response.data.nominal));
+                $('#rincian-total-terbayar').text(money(response.data.terbayar));
+                $('#rincian-total-sisa').text(money(response.data.sisa_bayar));
+                $('#modalRincianPiutang').modal('show');
+            }).fail(function() {
+                toastr.error('Gagal memuat rincian piutang.');
+            }).always(function() {
+                button.prop('disabled', false);
             });
         });
 

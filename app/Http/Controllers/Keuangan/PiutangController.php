@@ -8,6 +8,7 @@ use App\Models\Pemasukan;
 use App\Models\Pengeluaran;
 use App\Models\Piutang;
 use App\Services\PiutangPaymentService;
+use App\Services\PiutangUnitService;
 use App\Traits\LogAktivitasTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -25,11 +26,7 @@ class PiutangController extends Controller
 
         if ($request->ajax()) {
             app(PiutangPaymentService::class)->syncAll();
-            $data = Piutang::query()->orderByDesc('tanggal_piutang');
-
-            if ($request->filled('filter_tanggal')) {
-                $data->whereDate('tanggal_piutang', $request->filter_tanggal);
-            }
+            $data = app(PiutangUnitService::class)->rows($request->input('filter_tanggal'));
             
             return DataTables::of($data)
                 ->addIndexColumn()
@@ -69,11 +66,6 @@ class PiutangController extends Controller
                         ? Carbon::parse($row->tgl_pelunasan)->translatedFormat('j F Y')
                         : '';
                 })
-                ->filterColumn('tanggal_piutang', function ($query, $keyword) {
-                    $query->where(function ($q) use ($keyword) {
-                        $q->WhereDate('tanggal_piutang', 'like', "%{$keyword}%");
-                    });
-                })
                 ->addColumn('action', function ($row) use ($permissions) {
                     $editUrl   = route('piutang.edit', $row->id);
                     $detailUrl = route('piutang.show', $row->id);
@@ -88,6 +80,10 @@ class PiutangController extends Controller
             data-url="' . e($detailUrl) . '">
             Detail
         </button>';
+                    if ($isDetailOnly) {
+                        $btn .= '<button type="button" class="btn btn-info btn-sm mx-1 rincian-button"
+                            data-url="' . e($detailUrl) . '">Rincian Piutang</button>';
+                    }
                     if (!$isDetailOnly) {
                         if ($permissions['edit']) {
                             $btn .= '<button class="btn btn-primary btn-sm mx-1 edit-button"
@@ -138,13 +134,13 @@ class PiutangController extends Controller
     }
     public function show($id)
     {
-        $payments = app(PiutangPaymentService::class)->syncPiutang($id);
-        $list = Piutang::findOrFail($id);
+        [$list, $payments, $components] = app(PiutangUnitService::class)->detail($id);
 
         return response()->json([
             'status' => 'success',
             'data'   => $list,
             'payments' => $payments,
+            'components' => $components,
             'customer' => $list->id_customer ? \App\Models\Customer::find($list->id_customer)?->nama_lengkap : null,
         ]);
     }

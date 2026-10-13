@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pengaturan\HakAksesController;
 use App\Models\Bank;
 use App\Models\Hutang;
+use App\Models\MetodeBayar;
 use App\Models\Pemasukan;
 use App\Models\Pengeluaran;
 use App\Traits\LogAktivitasTrait;
@@ -78,6 +79,11 @@ class HutangController extends Controller
                     $deleteUrl = route('hutang.destroy', $row->id);
 
                     $btn = '<div class="d-flex justify-content-center">';
+                    if ($row->sisa_bayar > 0 && ($permissions['tambah'] || $permissions['edit'])) {
+                        $btn .= '<button type="button" class="btn btn-success btn-sm mx-1 bayar-hutang"
+                            data-url="' . e(route('hutang.bayar', $row->id)) . '"
+                            data-detail-url="' . e($editUrl) . '">Bayar Hutang</button>';
+                    }
                     if ($permissions['edit']) {
                         $btn .= '<button class="btn btn-primary btn-sm mx-1 edit-button"
                                 data-id="' . e($row->id) . '"
@@ -100,8 +106,38 @@ class HutangController extends Controller
         }
 
         $bankList = Bank::all();
+        $metodeBayarList = MetodeBayar::all();
 
-        return view('admin.keuangan.hutang.index', compact('permissions', 'bankList'));
+        return view('admin.keuangan.hutang.index', compact('permissions', 'bankList', 'metodeBayarList'));
+    }
+
+    public function bayar(Request $request, $id)
+    {
+        $request->merge([
+            'nominal' => is_scalar($request->nominal) ? str_replace('.', '', (string) $request->nominal) : null,
+            'id_hutang' => $id,
+            'id_kategori_transaksi' => 3,
+        ]);
+        $request->validate([
+            'nominal' => 'required|integer|min:1',
+            'id_bank' => 'required|exists:bank,id',
+            'id_metode_bayar' => 'required|exists:metode_bayar,id',
+        ], ['nominal.min' => 'Nominal pembayaran harus lebih dari nol.']);
+
+        return DB::transaction(function () use ($request, $id) {
+            $hutang = Hutang::whereKey($id)->lockForUpdate()->firstOrFail();
+            if ((int) $request->nominal > (int) $hutang->sisa_bayar) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'nominal' => 'Nominal pembayaran tidak boleh melebihi sisa hutang.',
+                ]);
+            }
+            $response = app(PengeluaranController::class)->store($request);
+            if ($response->getStatusCode() === 200 && (int) $hutang->fresh()->sisa_bayar === 0) {
+                $hutang->update(['tgl_pelunasan' => $request->tanggal]);
+            }
+
+            return $response;
+        });
     }
 
     public function edit($id)

@@ -28,6 +28,11 @@ class Piutang extends Model
         'id_komponen_biaya',
     ];
 
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'id_customer');
+    }
+
     public function kategori()
     {
         return $this->belongsTo(KategoriTransaksi::class, 'id_kategori_transaksi');
