@@ -395,7 +395,7 @@
                     $('#id_kategori_transaksi').val(kategori).trigger('change');
 
                     if (kategori == 12) {
-                        $('#id_kategori_transaksi').prop('disabled', true);
+                        $('#id_kategori_transaksi').prop('disabled', false);
                         $('#id_piutang').val(response.data.id_piutang).trigger('change');
                     } else {
                         $('#id_kategori_transaksi').prop('disabled', false);

@@ -71,21 +71,18 @@ class PemasukanController extends Controller
                 })
                 ->addColumn('action', function ($row) use ($permissions) {
                     $editUrl   = route('pemasukan.edit', $row->id);
-                    $detailUrl = route('pemasukan.show', $row->id);
                     $deleteUrl = route('pemasukan.destroy', $row->id);
 
                     $isDetailOnly = $row->id_hutang != 0 || $row->id_customer != 0 || $row->id_mutasi != 0;
 
                     $btn = '<div class="d-flex justify-content-center">';
 
-                    if ($isDetailOnly) {
-                        $btn .= '<button class="btn btn-primary btn-sm mx-1 detail-button"
-            data-id="' . e($row->id) . '"
-            data-url="' . e($detailUrl) . '">
-            Detail
-        </button>';
-                    } else {
-                        if ($permissions['edit']) {
+                    if ($permissions['edit']) {
+                        if ($row->plafon_sp3k !== null && $row->id_customer) {
+                            $btn .= '<a class="btn btn-primary btn-sm mx-1" href="' . e(route('pembayaran.detail', $row->id_customer)) . '">Edit</a>';
+                        } elseif ($row->id_mutasi) {
+                            $btn .= '<a class="btn btn-primary btn-sm mx-1" href="' . e(route('mutasi-saldo.index')) . '">Edit</a>';
+                        } else {
                             $btn .= '<button class="btn btn-primary btn-sm mx-1 edit-button"
                 data-id="' . e($row->id) . '"
                 data-url="' . e($editUrl) . '">
@@ -227,9 +224,10 @@ class PemasukanController extends Controller
             'id_bank' => 'required',
         ];
 
-        if ($request->id_kategori_transaksi == 2) {
-            $rules['id_kategori_transaksi'] = 'required';
-        }
+        $rules['id_kategori_transaksi'] = [
+            'required',
+            \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')->where('jenis_kategori', 'PEMASUKAN'),
+        ];
 
         if (empty($data->lampiran)) {
             $rules['lampiran'] = 'required|file|mimes:jpg,jpeg,png,pdf|max:2048';
@@ -238,6 +236,8 @@ class PemasukanController extends Controller
         }
 
         $request->validate($rules, [
+            'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
+            'id_kategori_transaksi.exists' => 'Pilih kategori transaksi berjenis pemasukan.',
             'tanggal.required'  => 'Tanggal wajib diisi.',
             'tanggal.date'      => 'Tanggal harus berupa tanggal.',
             'nominal.required'  => 'Nominal wajib diisi.',
@@ -248,8 +248,15 @@ class PemasukanController extends Controller
             'lampiran.max'      => 'Ukuran file maksimal 2MB.',
         ]);
 
+        if (KategoriTransaksi::whereKey($request->id_kategori_transaksi)->where('kategori', 'Pencairan KPR')->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'id_kategori_transaksi' => 'Pencairan KPR dikelola melalui detail pembayaran.',
+            ]);
+        }
+
         $db = [
             'tanggal'    => $request->tanggal,
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
             'id_bank'    => $request->id_bank,
             'keterangan' => $request->keterangan ?? '',
             'nominal'    => str_replace('.', '', $request->nominal),
@@ -274,7 +281,23 @@ class PemasukanController extends Controller
             $db['id_piutang'] = $request->id_piutang ?? 0;
         }
 
-        $data->update($db);
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $db) {
+            if ($data->id_hutang) {
+                $hutang = \App\Models\Hutang::whereKey($data->id_hutang)->lockForUpdate()->firstOrFail();
+                validator(['nominal' => $db['nominal']], [
+                    'nominal' => 'required|integer|min:'.$hutang->terbayar,
+                ], ['nominal.min' => 'Nominal hutang tidak boleh kurang dari jumlah yang sudah dibayar.'])->validate();
+                $remaining = (int) $db['nominal'] - (int) $hutang->terbayar;
+                $hutang->update([
+                    'nominal' => $db['nominal'], 'sisa_bayar' => $remaining,
+                    'status' => $remaining > 0 ? 1 : 2,
+                    'tgl_pelunasan' => $remaining > 0 ? null : $hutang->tgl_pelunasan,
+                    'tanggal_hutang' => $db['tanggal'], 'id_bank' => $db['id_bank'],
+                    'lampiran' => $db['lampiran'] ?? $data->lampiran,
+                ]);
+            }
+            $data->update($db);
+        });
         $this->logEdit('Pemasukan', $data->id);
 
         return response()->json(['status' => 'success']);

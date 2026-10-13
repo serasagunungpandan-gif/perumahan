@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 class MonthlyTransactionReport
 {
     public const TYPES = [
+        'semua' => 'Semua',
         'hold' => 'Hold', 'booking_fee' => 'Booking Fee', 'proses_bank' => 'Proses Bank',
         'sp3k' => 'SP3K', 'akad' => 'Akad',
     ];
@@ -26,6 +27,15 @@ class MonthlyTransactionReport
 
     public function counts(int $year, string $type): array
     {
+        if ($type === 'semua') {
+            $rows = null;
+            foreach (array_diff(array_keys(self::TYPES), ['semua']) as $kind) {
+                $counts = $this->counts($year, $kind);
+                if ($rows === null) $rows = $counts;
+                else foreach ($counts as $index => $row) $rows[$index]['jumlah'] += $row['jumlah'];
+            }
+            return $rows;
+        }
         [$query, $date] = $this->source($type);
         $monthExpression = DB::connection()->getDriverName() === 'sqlite'
             ? "CAST(strftime('%m', $date) AS INTEGER)" : "MONTH($date)";
@@ -43,6 +53,15 @@ class MonthlyTransactionReport
 
     public function details(int $year, string $type, ?int $month = null): \Illuminate\Database\Query\Builder
     {
+        if ($type === 'semua') {
+            $union = null;
+            foreach (array_diff(array_keys(self::TYPES), ['semua']) as $kind) {
+                $part = $this->details($year, $kind, $month)->reorder();
+                if ($union === null) $union = $part;
+                else $union->unionAll($part);
+            }
+            return DB::query()->fromSub($union, 'transactions')->orderBy('tanggal')->orderBy('jenis')->orderBy('id');
+        }
         [$query, $date] = $this->source($type);
         $start = Carbon::create($year, $month ?? 1, 1)->startOfDay();
         $end = $month ? $start->copy()->addMonth() : $start->copy()->addYear();
@@ -72,6 +91,25 @@ class MonthlyTransactionReport
             ->where($date, '>=', $start->format('Y-m-d'))->where($date, '<', $end->format('Y-m-d'))
             ->select(["$id as id", "$date as tanggal", "$code as kode", "$customer.nama_lengkap as nama",
                 "$customer.no_telp as telepon", 'lokasi_kavling.nama_kavling as lokasi', 'kavling_peta.kode_kavling as kavling'])
+            ->selectRaw('? as jenis', [self::TYPES[$type]])
             ->orderBy($date)->orderBy($id);
+    }
+
+    public function exportDetails(int $year, string $type): \Illuminate\Database\Query\Builder
+    {
+        $tables = match ($type) {
+            'hold' => ['pengajuan_hold'],
+            'booking_fee' => ['customer'],
+            'proses_bank' => ['wawancara', 'customer'],
+            'sp3k' => ['wawancara_sp3k', 'wawancara', 'customer'],
+            'akad' => ['detail_akad', 'akad', 'customer'],
+        };
+        $query = $this->details($year, $type);
+        foreach ($tables as $table) {
+            foreach (\Illuminate\Support\Facades\Schema::getColumnListing($table) as $column) {
+                $query->addSelect($table.'.'.$column.' as '.$table.'__'.$column);
+            }
+        }
+        return $query;
     }
 }

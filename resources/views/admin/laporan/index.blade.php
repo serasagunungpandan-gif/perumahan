@@ -32,7 +32,7 @@
 <div class="modal fade" id="reportDetailModal" tabindex="-1" aria-labelledby="reportDetailTitle" aria-hidden="true"><div class="modal-dialog modal-xl"><div class="modal-content">
 <div class="modal-header bg-indigo"><h5 class="modal-title" id="reportDetailTitle">Detail Transaksi</h5><button type="button" class="close text-white" data-dismiss="modal" aria-label="Tutup"><span>&times;</span></button></div>
 <div class="modal-body"><div id="reportDetailMessage" class="text-muted mb-2" role="status"></div>
-<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead><tr><th>No</th><th>Tanggal</th><th>Kode</th><th>Nama Customer</th><th>Telepon</th><th>Lokasi</th><th>Kavling</th></tr></thead><tbody id="reportDetailRows"></tbody></table></div>
+<div class="table-responsive"><table class="table table-sm table-bordered table-striped"><thead><tr><th>No</th><th>Tanggal</th><th>Jenis Transaksi</th><th>Kode</th><th>Nama Customer</th><th>Telepon</th><th>Lokasi</th><th>Kavling</th></tr></thead><tbody id="reportDetailRows"></tbody></table></div>
 <div class="d-flex align-items-center justify-content-between"><span id="reportDetailTotal"></span><div><button type="button" id="detailPrevious" class="btn btn-outline-secondary btn-sm">Sebelumnya</button> <button type="button" id="detailNext" class="btn btn-outline-secondary btn-sm">Berikutnya</button></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Tutup</button></div>
 </div></div></div>
@@ -61,7 +61,7 @@ $(function () {
                 response.data.forEach(function (item, index) {
                     const tr = $('<tr>');
                     const date = item.tanggal ? item.tanggal.slice(0, 10).split('-').reverse().join('-') : '-';
-                    [response.from + index, date, item.kode, item.nama, item.telepon, item.lokasi, item.kavling].forEach(value => $('<td>').text(value ?? '-').appendTo(tr));
+                    [response.from + index, date, item.jenis, item.kode, item.nama, item.telepon, item.lokasi, item.kavling].forEach(value => $('<td>').text(value ?? '-').appendTo(tr));
                     $('#reportDetailRows').append(tr);
                 });
                 $('#reportDetailMessage').text(response.total ? '' : 'Tidak ada data pada bulan ini.');

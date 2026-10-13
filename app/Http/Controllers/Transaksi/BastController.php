@@ -156,6 +156,8 @@ class BastController extends Controller
             'tanggal_bast'    => $tanggal->translatedFormat('j F Y'),
         ];
 
+        \PhpOffice\PhpWord\Settings::setOutputEscapingEnabled(true);
+
         return DocumentGenerator::generateDocx(
             templatePath: public_path('templates/template_bast.docx'),
             customer: $customer,

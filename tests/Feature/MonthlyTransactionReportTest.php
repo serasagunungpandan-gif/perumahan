@@ -55,7 +55,7 @@ class MonthlyTransactionReportTest extends TestCase
             $table->id();
             $table->string('kode_kavling');
         });
-        foreach (array_keys(MonthlyTransactionReport::TYPES) as $type) {
+        foreach (array_diff(array_keys(MonthlyTransactionReport::TYPES), ['semua']) as $type) {
             $rows = app(MonthlyTransactionReport::class)->counts(2026, $type);
             $this->assertCount(12, $rows);
             $this->assertSame(['bulan' => 'Januari', 'jumlah' => 2], $rows[0]);
@@ -68,6 +68,10 @@ class MonthlyTransactionReportTest extends TestCase
             $this->assertCount(1, $report->details(2026, $type, 12)->get());
             $this->assertCount(3, $report->details(2026, $type)->get());
         }
+        $report = app(MonthlyTransactionReport::class);
+        $this->assertSame(15, array_sum(array_column($report->counts(2026, 'semua'), 'jumlah')));
+        $this->assertCount(10, $report->details(2026, 'semua', 1)->get());
+        $this->assertCount(15, $report->details(2026, 'semua')->get());
         Schema::create('menu', function (Blueprint $table) { $table->id(); $table->string('route_name'); });
         Schema::create('hak_akses', function (Blueprint $table) {
             $table->id(); $table->integer('id_user'); $table->integer('id_menu'); $table->boolean('lihat');
@@ -80,6 +84,42 @@ class MonthlyTransactionReportTest extends TestCase
         $response = $this->get('/admin/laporan/excel?tahun=2026&jenis_transaksi=akad');
         $response->assertOk()->assertDownload('laporan-akad-2026.xlsx');
         $this->assertStringStartsWith('PK', $response->streamedContent());
+        $this->getJson('/admin/laporan/detail?tahun=2026&jenis_transaksi=semua&bulan=1')->assertOk()->assertJsonPath('total', 10);
+        Schema::table('customer', function (Blueprint $table) {
+            for ($index = 1; $index <= 30; $index++) $table->string('extra_'.$index)->nullable();
+        });
+        DB::table('customer')->where('id', 1)->update(['extra_30' => '=Test literal', 'no_telp' => '0812345']);
+        $response = $this->get('/admin/laporan/excel?tahun=2026&jenis_transaksi=semua');
+        $response->assertOk()->assertDownload('laporan-semua-2026.xlsx');
+        $path = tempnam(sys_get_temp_dir(), 'report');
+        try {
+            file_put_contents($path, $response->streamedContent());
+            $book = \PhpOffice\PhpSpreadsheet\IOFactory::load($path);
+            $this->assertSame(['Customer dan Proses'], $book->getSheetNames());
+            $sheet = $book->getActiveSheet();
+            $this->assertSame(5, $sheet->getHighestRow());
+            $headers = $sheet->rangeToArray('A1:'.$sheet->getHighestColumn().'1')[0];
+            $position = array_search('Extra 30', $headers, true);
+            $this->assertNotFalse($position);
+            $this->assertGreaterThan(26, $position);
+            $cell = $sheet->getCell(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($position + 1).'2');
+            $this->assertSame('=Test literal', $cell->getValue());
+            $this->assertSame('s', $cell->getDataType());
+            $this->assertGreaterThan(0, $sheet->getColumnDimension($sheet->getHighestColumn())->getWidth());
+            $this->assertSame(['Hold', 'Booking Fee', 'Proses Bank', 'SP3K', 'Akad'], array_slice($headers, -5));
+            $colors = [];
+            foreach (range(count($headers) - 4, count($headers)) as $index) {
+                $column = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($index);
+                $colors[] = $sheet->getStyle($column.'1')->getFill()->getStartColor()->getRGB();
+            }
+            $this->assertCount(5, array_unique($colors));
+            $stageStart = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headers) - 4);
+            $this->assertSame(['-', '01-01-2026', '01-01-2027', '01-01-2027', '01-01-2027'], $sheet->rangeToArray($stageStart.'2:'.$sheet->getHighestColumn().'2')[0]);
+            $this->assertSame(['-', '31-01-2026', '-', '-', '-'], $sheet->rangeToArray($stageStart.'3:'.$sheet->getHighestColumn().'3')[0]);
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
         DB::table('hak_akses')->update(['lihat' => 0]);
         $this->getJson('/admin/laporan/detail?tahun=2026&jenis_transaksi=akad&bulan=1')->assertForbidden();
         $this->get('/admin/laporan/excel?tahun=2026&jenis_transaksi=akad')->assertForbidden();

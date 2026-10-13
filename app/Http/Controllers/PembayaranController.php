@@ -146,17 +146,24 @@ class PembayaranController extends Controller
         $customer = Customer::with([
             'piutangs',
             'pemasukans' => function ($q) {
-                $q->where('keterangan', 'NOT LIKE', 'Biaya ganti nama%');
+                $q->where(function ($query) {
+                    $query->whereNull('keterangan')->orWhere('keterangan', 'NOT LIKE', 'Biaya ganti nama%');
+                })->orderBy('tanggal')->orderBy('id');
             }
         ])->findOrFail($id);
 
         $lokasi          = LokasiKavling::with('perusahaan')->find($customer->id_lokasi);
         $kavling         = KavlingPeta::with('perusahaan')->find($customer->id_kavling);
-        $perusahaan      = $kavling->perusahaan;
+        $perusahaan      = $kavling?->perusahaan;
         if (! $perusahaan && $lokasi) {
             $perusahaanId = $lokasi->perusahaan->first()->id_perusahaan ?? null;
             $perusahaan   = $perusahaanId ? Perusahaan::find($perusahaanId) : null;
         }
+
+        $profil = PengaturanProfil::first();
+        $namaProfil = $perusahaan?->nama_perusahaan ?: ($profil?->nama_perusahaan ?? 'Pengelola Perumahan');
+        $telpProfil = $perusahaan?->telp_perusahaan ?: ($profil?->telp ?? '-');
+        $sp3k = app(\App\Services\Sp3kPlafonService::class)->latestForCustomer($customer->id);
 
         $kopPath          = public_path('assets/img/kop-surat-rekap.jpg');
         $footerPath       = public_path('assets/img/foot-surat-rekap.jpg');
@@ -256,7 +263,10 @@ class PembayaranController extends Controller
         $labelW = 28;
         $valueW = 28;
 
-        $pdf->SetXY($labelX +5, $startY);
+        $pdf->SetXY(10, $detailSectionBottomY + 4);
+        $labelX = 5;
+        $labelW = 35;
+        $valueW = 42;
         $pdf->Cell($labelW, 6, 'Total Tagihan', 0, 0);
         $pdf->Cell(3, 6, ': Rp.', 0, 0);
         $pdf->Cell($valueW, 6, number_format($totalTagihan, 0, ',', '.'), 0, 1, 'R');
@@ -269,12 +279,12 @@ class PembayaranController extends Controller
         $pdf->SetX($labelX+5);
         $pdf->Cell($labelW, 6, 'Plafon SP3K', 0, 0);
         $pdf->Cell(3, 6, ': Rp.', 0, 0);
-        $pdf->Cell($valueW, 6, number_format(app(\App\Services\Sp3kPlafonService::class)->latestForCustomer($customer->id)?->acc_plafon ?? 0, 0, ',', '.'), 0, 1, 'R');
+        $pdf->Cell($valueW, 6, number_format($sp3k?->acc_plafon ?? 0, 0, ',', '.'), 0, 1, 'R');
 
         $pdf->SetX($labelX+5);
         $pdf->Cell($labelW, 6, 'DP ke Bank', 0, 0);
         $pdf->Cell(3, 6, ': Rp.', 0, 0);
-        $pdf->Cell($valueW, 6, number_format(app(\App\Services\Sp3kPlafonService::class)->latestForCustomer($customer->id)?->dp_nilai ?? 0, 0, ',', '.'), 0, 1, 'R');
+        $pdf->Cell($valueW, 6, number_format($sp3k?->dp_nilai ?? 0, 0, ',', '.'), 0, 1, 'R');
 
         $pdf->SetX($labelX+5);
         $pdf->Cell($labelW, 6, 'Sisa Bayar', 0, 0);
@@ -302,11 +312,11 @@ class PembayaranController extends Controller
         $no   = 1;
         $sisa = $totalTagihan;
 
-        foreach ($customer->pemasukans->sortBy('id') as $byr) {
+        foreach ($customer->pemasukans as $byr) {
 
             $sisa -= $byr->nominal;
 
-            $keterangan = explode('#', $byr->keterangan)[0] ?? '';
+            $keterangan = explode('#', $byr->keterangan ?? '')[0];
             $keteranganText = ($sisa <= 0) ? 'LUNAS' : $keterangan;
 
             $fill = ($no % 2 == 0)
@@ -358,8 +368,10 @@ class PembayaranController extends Controller
         $pdf->Cell(70, 6, '', 0, 0);
         $pdf->Cell(60, 6, $perusahaan->nama_penandatangan ?? 'ADMIN', 'B', 1, 'C');
 
-        $pdf->Output();
-        exit;
+        return response($pdf->Output('rekap-pembayaran-'.$customer->id.'.pdf', 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="rekap-pembayaran-'.$customer->id.'.pdf"',
+        ]);
     }
 
     // public function cetak($id)
