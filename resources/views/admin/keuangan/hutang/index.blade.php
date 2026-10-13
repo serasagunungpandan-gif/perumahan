@@ -41,7 +41,9 @@
                                             <th width="5%">No</th>
                                             <th width="15%">Tanggal Hutang</th>
                                             <th width="20%">Deskripsi</th>
-                                            <th width="15%">Nominal</th>
+                                            <th>Nominal Awal</th>
+                                            <th>Terbayar</th>
+                                            <th>Sisa Hutang</th>
                                             <th width="18%">Status</th>
                                             <th width="10%">Tanggal Pelunasan</th>
                                             <th width="10%" class="text-center">Action</th>
@@ -296,6 +298,18 @@
                     {
                         data: 'nominal',
                         name: 'nominal',
+                        orderable: false,
+                        searchable: false
+                    },
+                    {
+                        data: 'terbayar',
+                        name: 'terbayar',
+                        orderable: false,
+                        searchable: false
+                    },
+                    {
+                        data: 'sisa_bayar',
+                        name: 'sisa_bayar',
                         orderable: false,
                         searchable: false
                     },

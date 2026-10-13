@@ -13,4 +13,12 @@ class KategoriTransaksi extends Model
     protected $fillable = ['kode', 'kategori', 'jenis_kategori', 'stt_fix'];
 
     public $timestamps = false;
+
+    public static function pembayaranHutang(): self
+    {
+        return static::firstOrCreate(
+            ['kategori' => 'Pembayaran Hutang', 'jenis_kategori' => 'PENGELUARAN'],
+            ['kode' => 'HUTANG', 'stt_fix' => 1]
+        );
+    }
 }

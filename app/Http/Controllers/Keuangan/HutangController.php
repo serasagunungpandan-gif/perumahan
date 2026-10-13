@@ -44,6 +44,8 @@ class HutangController extends Controller
                         <span>' . number_format($row->nominal, 0, ',', '.') . '</span>
                     </div>';
                 })
+                ->editColumn('terbayar', fn ($row) => 'Rp. ' . number_format($row->terbayar, 0, ',', '.'))
+                ->editColumn('sisa_bayar', fn ($row) => 'Rp. ' . number_format($row->sisa_bayar, 0, ',', '.'))
                 ->addColumn('lampiran', function ($row) {
                     if ($row->lampiran) {
                         return '<button class="btn btn-sm btn-success show-lampiran" data-file="' . e($row->lampiran) . '" data-toggle="modal" data-target="#modallampiran">Lihat</button>';
@@ -51,7 +53,7 @@ class HutangController extends Controller
                     return '-';
                 })
                 ->editColumn('status', function ($row) {
-                    $badge = match ($row->status) {
+                    $badge = match ((int) $row->status) {
                         1       => '<span class="badge bg-danger">Belum Lunas</span>',
                         2       => '<span class="badge bg-success">Sudah Lunas</span>',
                         default => '<span class="badge bg-warning">Status Tidak Dikenal</span>',
@@ -116,7 +118,6 @@ class HutangController extends Controller
         $request->merge([
             'nominal' => is_scalar($request->nominal) ? str_replace('.', '', (string) $request->nominal) : null,
             'id_hutang' => $id,
-            'id_kategori_transaksi' => 3,
         ]);
         $request->validate([
             'nominal' => 'required|integer|min:1',
@@ -131,6 +132,7 @@ class HutangController extends Controller
                     'nominal' => 'Nominal pembayaran tidak boleh melebihi sisa hutang.',
                 ]);
             }
+            $request->merge(['id_kategori_transaksi' => \App\Models\KategoriTransaksi::pembayaranHutang()->id]);
             $response = app(PengeluaranController::class)->store($request);
             if ($response->getStatusCode() === 200 && (int) $hutang->fresh()->sisa_bayar === 0) {
                 $hutang->update(['tgl_pelunasan' => $request->tanggal]);
@@ -224,9 +226,13 @@ class HutangController extends Controller
     {
         $data = Hutang::findOrFail($id);
 
+        $request->merge([
+            'nominal' => is_scalar($request->nominal) ? str_replace('.', '', (string) $request->nominal) : null,
+        ]);
+
         $rules = [
             'tanggal_hutang' => 'required|date',
-            'nominal'        => 'required',
+            'nominal'        => 'required|integer|min:' . max(1, (int) $data->terbayar),
             'id_bank'        => 'required',
             'deskripsi'      => 'required',
         ];
@@ -241,6 +247,7 @@ class HutangController extends Controller
             'tanggal_hutang.required' => 'Tanggal hutang wajib diisi.',
             'tanggal_hutang.date'     => 'Tanggal hutang harus berupa tanggal.',
             'nominal.required'        => 'Nominal wajib diisi.',
+            'nominal.min'             => 'Nominal hutang tidak boleh lebih kecil dari total pembayaran.',
             'id_bank.required'        => 'Bank wajib diisi.',
             'lampiran.required'       => 'Lampiran wajib diisi.',
             'lampiran.file'           => 'Lampiran harus berupa file.',
@@ -257,9 +264,10 @@ class HutangController extends Controller
                 'deskripsi'      => $request->deskripsi,
                 'nominal'        => str_replace('.', '', $request->nominal),
                 'id_bank'        => $request->id_bank,
-                'terbayar'       => 0,
-                'sisa_bayar'     => str_replace('.', '', $request->nominal),
-                'tgl_pelunasan'  => null,
+                'sisa_bayar'     => (int) $request->nominal - (int) $data->terbayar,
+                'status'         => (int) $request->nominal === (int) $data->terbayar ? 2 : 1,
+                'tgl_pelunasan'  => (int) $request->nominal === (int) $data->terbayar
+                    ? ($data->tgl_pelunasan ?? now()->toDateString()) : null,
             ];
 
             $filename = $data->lampiran;

@@ -174,7 +174,7 @@ class PengeluaranController extends Controller
             'id_metode_bayar'       => 'required',
             'lampiran'              => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
             'id_kategori_transaksi' => 'required',
-            'id_hutang'             => 'required_if:id_kategori_transaksi,3',
+            'id_hutang'             => [\Illuminate\Validation\Rule::requiredIf(fn () => KategoriTransaksi::whereKey($request->id_kategori_transaksi)->where('jenis_kategori', 'PENGELUARAN')->where('kategori', 'Pembayaran Hutang')->exists())],
         ], [
             'tanggal.required'               => 'Tanggal wajib diisi.',
             'tanggal.date'                   => 'Tanggal harus berupa tanggal.',

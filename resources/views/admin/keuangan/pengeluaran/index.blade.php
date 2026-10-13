@@ -152,7 +152,7 @@
                                     id="id_kategori_transaksi">
                                     <option value=""></option>
                                     @foreach ($kategoriTransaksi as $item)
-                                        <option value="{{ $item->id }}">{{ $item->kategori }}</option>
+                                        <option value="{{ $item->id }}" data-hutang="{{ $item->kategori === 'Pembayaran Hutang' ? '1' : '0' }}">{{ $item->kategori }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -307,9 +307,7 @@
 
         $(document).ready(function() {
             $('#id_kategori_transaksi').on('change', function() {
-                const selectedValue = $(this).val(); // Ambil value saja
-
-                if (selectedValue == 10) {
+                if ($(this).find('option:selected').attr('data-hutang') === '1') {
                     $('#row-hutang').show();
                     $('#sisa_bayar').val('');
                 } else {
