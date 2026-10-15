@@ -8,6 +8,7 @@ use App\Models\Hutang;
 use App\Models\KategoriTransaksi;
 use App\Models\MetodeBayar;
 use App\Models\Pengeluaran;
+use App\Models\Piutang;
 use App\Traits\LogAktivitasTrait;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -129,12 +130,15 @@ class PengeluaranController extends Controller
         }
 
         $kategoriTransaksi = KategoriTransaksi::where('jenis_kategori', 'PENGELUARAN')
+            ->orWhereIn('id', Piutang::select('id_kategori_transaksi')->whereNotNull('id_kategori_transaksi'))
             ->orderBy('id')
             ->get();
 
         $kategoriTransaksiDetail = $kategoriTransaksi;
 
-        $HutangList = Hutang::where('status', 1)->get();
+        $HutangList = Hutang::where('status', 1)
+            ->orWhereIn('id', Pengeluaran::where('id_hutang', '>', 0)->select('id_hutang'))
+            ->get();
 
         $bankList = Bank::all();
         $metodeBayarList = MetodeBayar::whereIn('id', [1, 2])->get();
@@ -166,20 +170,17 @@ class PengeluaranController extends Controller
     {
         $request->validate([
             'tanggal'               => 'required|date',
-            'no_tanda_terima'       => 'required|max:100|unique:pengeluaran,no_tanda_terima',
             'diterima_dari'         => 'required|max:255',
             'nama_penerima'         => 'required|max:255',
             'nominal'               => 'required',
             'id_bank'               => 'required',
             'id_metode_bayar'       => 'required',
             'lampiran'              => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
-            'id_kategori_transaksi' => 'required',
+            'id_kategori_transaksi' => ['required', 'integer', \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')->where('jenis_kategori', 'PENGELUARAN')],
             'id_hutang'             => [\Illuminate\Validation\Rule::requiredIf(fn () => KategoriTransaksi::whereKey($request->id_kategori_transaksi)->where('jenis_kategori', 'PENGELUARAN')->where('kategori', 'Pembayaran Hutang')->exists())],
         ], [
             'tanggal.required'               => 'Tanggal wajib diisi.',
             'tanggal.date'                   => 'Tanggal harus berupa tanggal.',
-            'no_tanda_terima.required'       => 'Nomor tanda terima wajib diisi.',
-            'no_tanda_terima.unique'         => 'Nomor tanda terima sudah digunakan.',
             'diterima_dari.required'         => 'Nama pemberi/penyetor wajib diisi.',
             'nama_penerima.required'         => 'Nama penerima wajib diisi.',
             'nominal.required'               => 'Nominal wajib diisi.',
@@ -190,6 +191,8 @@ class PengeluaranController extends Controller
             'lampiran.mimes'                 => 'Format lampiran harus jpg, jpeg, png, atau pdf.',
             'lampiran.max'                   => 'Ukuran file maksimal 2MB.',
             'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
+            'id_kategori_transaksi.exists' => 'Kategori transaksi tidak valid.',
+            'id_hutang.required' => 'Hutang wajib dipilih.',
             'id_hutang.required_if'          => 'Hutang wajib dipilih',
         ]);
 
@@ -214,7 +217,6 @@ class PengeluaranController extends Controller
             'id_mutasi'             => 0,
             'id_bank'               => $request->id_bank,
             'tanggal'               => $request->tanggal,
-            'no_tanda_terima'       => $request->no_tanda_terima,
             'diterima_dari'         => $request->diterima_dari,
             'nama_penerima'         => $request->nama_penerima,
             'nominal'               => str_replace('.', '', $request->nominal),
@@ -267,7 +269,6 @@ class PengeluaranController extends Controller
 
         $rules = [
             'tanggal' => 'required|date',
-            'no_tanda_terima' => 'required|max:100|unique:pengeluaran,no_tanda_terima,' . $id,
             'diterima_dari' => 'required|max:255',
             'nama_penerima' => 'required|max:255',
             'nominal' => 'required',
@@ -275,9 +276,12 @@ class PengeluaranController extends Controller
             'id_metode_bayar' => 'required',
         ];
 
-        if ($request->id_kategori_transaksi == 5) {
-            $rules['id_kategori_transaksi'] = 'required';
+        $rules['id_kategori_transaksi'] = ['required', 'integer', \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')->where('jenis_kategori', 'PENGELUARAN')];
+        if ($data->id_piutang) {
+            $rules['id_kategori_transaksi'] = ['required', 'integer', 'exists:kategori_transaksi,id'];
         }
+        $isDebtPayment = KategoriTransaksi::whereKey($request->id_kategori_transaksi)->where('kategori', 'Pembayaran Hutang')->where('jenis_kategori', 'PENGELUARAN')->exists();
+        $rules['id_hutang'] = [\Illuminate\Validation\Rule::requiredIf($isDebtPayment), 'nullable', 'integer', 'exists:hutang,id'];
 
         if (empty($data->lampiran)) {
             $rules['lampiran'] = 'required|file|mimes:jpg,jpeg,png,pdf|max:2048';
@@ -288,8 +292,6 @@ class PengeluaranController extends Controller
         $request->validate($rules, [
             'tanggal.required'               => 'Tanggal wajib diisi.',
             'tanggal.date'                   => 'Tanggal harus berupa tanggal.',
-            'no_tanda_terima.required'       => 'Nomor tanda terima wajib diisi.',
-            'no_tanda_terima.unique'         => 'Nomor tanda terima sudah digunakan.',
             'diterima_dari.required'         => 'Nama pemberi/penyetor wajib diisi.',
             'nama_penerima.required'         => 'Nama penerima wajib diisi.',
             'nominal.required'               => 'Nominal wajib diisi.',
@@ -299,12 +301,22 @@ class PengeluaranController extends Controller
             'lampiran.file'                  => 'Lampiran harus berupa file.',
             'lampiran.mimes'                 => 'Format lampiran harus jpg, jpeg, png, atau pdf.',
             'lampiran.max'                   => 'Ukuran file maksimal 2MB.',
-            'id_kategori_transaksi.required' => 'Kategori transaksi wajib diisi jika memilih jenis 5.',
+            'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
+            'id_kategori_transaksi.exists' => 'Kategori transaksi tidak valid.',
+            'id_hutang.required' => 'Hutang wajib dipilih.',
         ]);
 
+        $newDebtId = $isDebtPayment ? (int) $request->id_hutang : 0;
+        $newAmount = (int) str_replace('.', '', $request->nominal);
+        $newDebt = $newDebtId ? Hutang::findOrFail($newDebtId) : null;
+        if ($newDebt && $newAmount > $newDebt->sisa_bayar + ((int) $data->id_hutang === $newDebtId ? $data->nominal : 0)) {
+            return response()->json(['errors' => ['nominal' => ['Nominal tidak boleh lebih besar dari sisa hutang.']]], 422);
+        }
+
         $db = [
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
+            'id_hutang' => $newDebtId,
             'tanggal'    => $request->tanggal,
-            'no_tanda_terima' => $request->no_tanda_terima,
             'diterima_dari' => $request->diterima_dari,
             'nama_penerima' => $request->nama_penerima,
             'id_bank'    => $request->id_bank,
@@ -327,64 +339,31 @@ class PengeluaranController extends Controller
             $db['lampiran'] = $filename;
         }
 
-        if ($data->id_kategori_transaksi == 10) {
-            if ($request->id_hutang != $data->id_hutang) {
-                $hutanglama = Hutang::find($data->id_hutang);
-                if ($hutanglama) {
-                    $hutanglama->update([
-                        'terbayar'      => $hutanglama->terbayar - $data->nominal,
-                        'sisa_bayar'    => $hutanglama->sisa_bayar + $data->nominal,
-                        'status'        => 1,
-                        'tgl_pelunasan' => null,
-                    ]);
-                }
-
-                $hutangbaru = Hutang::find($request->id_hutang);
-                if ($hutangbaru) {
-                    $nominalBayar  = str_replace('.', '', $request->nominal);
-                    $sisaBayarBaru = $hutangbaru->sisa_bayar - $nominalBayar;
-
-                    $updateData = [
-                        'terbayar'   => $nominalBayar,
-                        'sisa_bayar' => $sisaBayarBaru,
-                    ];
-
-                    if ($sisaBayarBaru == 0) {
-                        $updateData['status']        = 2;
-                        $updateData['tgl_pelunasan'] = Carbon::now();
-                    }
-
-                    $hutangbaru->update($updateData);
-                }
-            } else {
-                $hutanglama2 = Hutang::find($data->id_hutang);
-                if ($hutanglama2) {
-                    $hutanglama2->update([
-                        'terbayar'      => $hutanglama2->terbayar - $data->nominal,
-                        'sisa_bayar'    => $hutanglama2->sisa_bayar + $data->nominal,
-                        'status'        => 1,
-                        'tgl_pelunasan' => null,
-                    ]);
-
-                    $nominalBayar  = $hutanglama2->terbayar + str_replace('.', '', $request->nominal);
-                    $sisaBayarBaru = $hutanglama2->sisa_bayar - str_replace('.', '', $request->nominal);
-
-                    $updateData = [
-                        'terbayar'   => $nominalBayar,
-                        'sisa_bayar' => $sisaBayarBaru,
-                    ];
-
-                    if ($sisaBayarBaru == 0) {
-                        $updateData['status']        = 2;
-                        $updateData['tgl_pelunasan'] = Carbon::now();
-                    }
-
-                    $hutanglama2->update($updateData);
-                }
-            }
+        if ($data->id_hutang && ($oldDebt = Hutang::find($data->id_hutang))) {
+            $oldDebt->update([
+                'terbayar' => $oldDebt->terbayar - $data->nominal,
+                'sisa_bayar' => $oldDebt->sisa_bayar + $data->nominal,
+                'status' => 1,
+                'tgl_pelunasan' => null,
+            ]);
+        }
+        if ($newDebt) {
+            $newDebt->refresh();
+            $remaining = $newDebt->sisa_bayar - $newAmount;
+            $newDebt->update([
+                'terbayar' => $newDebt->terbayar + $newAmount,
+                'sisa_bayar' => $remaining,
+                'status' => $remaining == 0 ? 2 : 1,
+                'tgl_pelunasan' => $remaining == 0 ? $request->tanggal : null,
+            ]);
         }
 
         $data->update($db);
+        if ($data->id_piutang) {
+            Piutang::whereKey($data->id_piutang)->update([
+                'id_kategori_transaksi' => $data->id_kategori_transaksi,
+            ]);
+        }
         $this->logEdit('Pengeluaran', $data->id);
 
         return response()->json(['status' => 'success']);

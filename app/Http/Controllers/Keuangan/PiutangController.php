@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Keuangan;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Pengaturan\HakAksesController;
 use App\Models\Bank;
+use App\Models\KategoriTransaksi;
 use App\Models\Pemasukan;
 use App\Models\Pengeluaran;
 use App\Models\Piutang;
@@ -118,8 +119,9 @@ class PiutangController extends Controller
         }
 
         $bankList = Bank::all();
+        $kategoriTransaksi = KategoriTransaksi::orderBy('kategori')->get();
 
-        return view('admin.keuangan.piutang.index', compact('permissions', 'bankList'));
+        return view('admin.keuangan.piutang.index', compact('permissions', 'bankList', 'kategoriTransaksi'));
     }
 
     public function edit($id)
@@ -151,6 +153,7 @@ class PiutangController extends Controller
             'tanggal_piutang' => 'required|date',
             'nominal'         => 'required',
             'id_bank'         => 'required',
+            'id_kategori_transaksi' => 'required|integer|exists:kategori_transaksi,id',
             'deskripsi'       => 'required',
             'lampiran'        => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
         ], [
@@ -158,6 +161,8 @@ class PiutangController extends Controller
             'tanggal_piutang.date'     => 'Tanggal piutang harus berupa tanggal.',
             'nominal.required'         => 'Nominal wajib diisi.',
             'id_bank.required'         => 'Bank wajib diisi.',
+            'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
+            'id_kategori_transaksi.exists' => 'Kategori transaksi tidak valid.',
             'deskripsi.required'       => 'Deskripsi wajib diisi.',
             'lampiran.required'        => 'Lampiran wajib diisi.',
             'lampiran.file'            => 'Lampiran harus berupa file.',
@@ -167,6 +172,7 @@ class PiutangController extends Controller
 
         $db = [
             'id_bank'         => $request->id_bank,
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
             'tanggal_piutang' => $request->tanggal_piutang,
             'deskripsi'       => $request->deskripsi,
             'nominal'         => str_replace('.', '', $request->nominal),
@@ -196,7 +202,7 @@ class PiutangController extends Controller
             'tanggal'               => $request->tanggal_piutang,
             'nominal'               => str_replace('.', '', $request->nominal),
             'lampiran'              => $filename,
-            'id_kategori_transaksi' => 11,
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
             'keterangan'            => $request->deskripsi,
         ]);
 
@@ -212,6 +218,7 @@ class PiutangController extends Controller
             'tanggal_piutang' => 'required|date',
             'nominal'         => 'required',
             'id_bank'         => 'required',
+            'id_kategori_transaksi' => 'required|integer|exists:kategori_transaksi,id',
             'deskripsi'       => 'required',
         ];
 
@@ -226,6 +233,8 @@ class PiutangController extends Controller
             'tanggal_piutang.date'     => 'Tanggal Piutang harus berupa tanggal.',
             'nominal.required'         => 'Nominal wajib diisi.',
             'id_bank.required'         => 'Bank wajib diisi.',
+            'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
+            'id_kategori_transaksi.exists' => 'Kategori transaksi tidak valid.',
             'lampiran.required'        => 'Lampiran wajib diisi.',
             'lampiran.file'            => 'Lampiran harus berupa file.',
             'lampiran.mimes'           => 'Format lampiran harus jpg, jpeg, png, atau pdf.',
@@ -237,6 +246,7 @@ class PiutangController extends Controller
             'tanggal_piutang' => $request->tanggal_piutang,
             'deskripsi'       => $request->deskripsi,
             'id_bank'         => $request->id_bank,
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
             'nominal'         => str_replace('.', '', $request->nominal),
         ];
 
@@ -260,6 +270,7 @@ class PiutangController extends Controller
 
         $pengeluaran = Pengeluaran::where('id_piutang', $id)->first();
         $pengeluaran?->update([
+            'id_kategori_transaksi' => $request->id_kategori_transaksi,
             'tanggal'  => $request->tanggal_piutang,
             'id_bank'  => $request->id_bank,
             'nominal'  => str_replace('.', '', $request->nominal),

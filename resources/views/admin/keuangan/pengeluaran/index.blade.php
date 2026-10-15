@@ -77,12 +77,7 @@
                             </div>
                         </div>
                         <div class="form-group row">
-                            <label for="no_tanda_terima" class="col-sm-3 col-form-label">Nomor Tanda Terima</label>
-                            <div class="col-sm-3">
-                                <input type="text" class="form-control" id="no_tanda_terima" name="no_tanda_terima"
-                                    placeholder="Contoh: TT-001">
-                            </div>
-                            <label for="id_metode_bayar" class="col-sm-2 col-form-label">Metode Bayar</label>
+                            <label for="id_metode_bayar" class="col-sm-3 col-form-label">Metode Bayar</label>
                             <div class="col-sm-4">
                                 <select class="form-select select-metode-bayar" name="id_metode_bayar" id="id_metode_bayar">
                                     <option value=""></option>
@@ -411,7 +406,6 @@
                     $('#modalFormLabel').text('Edit Pengeluaran');
                     $('#primary_id').val(response.data.id);
                     $('#tanggal').val(response.data.tanggal);
-                    $('#no_tanda_terima').val(response.data.no_tanda_terima);
                     $('#diterima_dari').val(response.data.diterima_dari);
                     $('#nama_penerima').val(response.data.nama_penerima);
                     $('#id_metode_bayar').val(response.data.id_metode_bayar).trigger('change');
@@ -430,14 +424,12 @@
                     const kategori = response.data.id_kategori_transaksi;
                     $('#id_kategori_transaksi').val(kategori).trigger('change');
 
-                    if (kategori == 10) {
-                        $('#id_kategori_transaksi').prop('disabled', true);
+                    $('#id_kategori_transaksi').prop('disabled', false);
+                    $('#id_hutang').prop('disabled', false);
+                    if ($('#id_kategori_transaksi option:selected').attr('data-hutang') === '1') {
                         $('#id_hutang').val(response.data.id_hutang).trigger('change');
-                    } else {
-                        $('#id_kategori_transaksi').prop('disabled', false);
                     }
                     $('#id_bank').val(response.data.id_bank).trigger('change');
-                    $('#id_hutang').prop('disabled', true);
                     $('#modalForm').modal('show');
                 }
             });
@@ -481,7 +473,7 @@
             $('#id_metode_bayar').val('').trigger('change');
             $('#id_kategori_transaksi').val('').trigger('change');
             $('#id_kategori_transaksi').prop('disabled', false);
-            $('#id_hutang').val('').trigger('change');
+            $('#id_hutang').prop('disabled', false).val('').trigger('change');
             $('.is-invalid').removeClass('is-invalid');
             $('.invalid-feedback').remove();
             let submitBtn = $('#submitBtn');

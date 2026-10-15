@@ -127,6 +127,17 @@
                             </div>
                         </div>
                         <div class="form-group row">
+                            <label for="id_kategori_transaksi" class="col-sm-3 col-form-label">Kategori Transaksi</label>
+                            <div class="col-sm-8">
+                                <select class="form-control" name="id_kategori_transaksi" id="id_kategori_transaksi" required>
+                                    <option value="">Pilih Kategori Transaksi</option>
+                                    @foreach ($kategoriTransaksi as $item)
+                                        <option value="{{ $item->id }}">{{ $item->kategori }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
                             <label class="col-sm-3 col-form-label">Lampiran</label>
                             <div class="col-sm-4">
                                 <input type="file" class="mb-2" id="lampiran" name="lampiran"
@@ -429,6 +440,7 @@
                     $('#terbayar').val(terbayar.toLocaleString('id-ID'));
                     $('#sisa_bayar').val(sisaBayar.toLocaleString('id-ID'));
                     $('#id_bank').val(response.data.id_bank).trigger('change');
+                    $('#id_kategori_transaksi').val(response.data.id_kategori_transaksi || '').trigger('change');
 
                     $('#info-pembayaran').show();
 
@@ -546,6 +558,7 @@
             $('#formData')[0].reset();
             $('#primary_id').val('');
             $('#id_bank').val('').trigger('change');
+            $('#id_kategori_transaksi').val('').trigger('change');
             $('#info-pembayaran').hide();
             $('.is-invalid').removeClass('is-invalid');
             $('.invalid-feedback').remove();
