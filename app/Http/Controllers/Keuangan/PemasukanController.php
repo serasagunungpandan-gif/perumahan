@@ -120,7 +120,9 @@ class PemasukanController extends Controller
 
         $kategoriTransaksiDetail = $kategoriTransaksi;
 
-        $PiutangList = Piutang::where('status', 1)->where('id_customer', 0)->get();
+        $PiutangList = Piutang::where(function ($query) {
+            $query->whereNull('id_customer')->orWhere('id_customer', 0);
+        })->get();
 
         $bankList = Bank::all();
 

@@ -127,13 +127,13 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="form-group row" id="row-hutang" style="display: none;">
-                            <label for="id_piutang" class="col-sm-3 col-form-label">Piutang</label>
+                        <div class="form-group row" id="row-hutang">
+                            <label for="id_piutang" class="col-sm-3 col-form-label">Pembayaran Piutang</label>
                             <div class="col-sm-3">
                                 <select class="form-select select-piutang" name="id_piutang" id="id_piutang">
                                     <option value=""></option>
                                     @foreach ($PiutangList as $item)
-                                        <option value="{{ $item->id }}">{{ $item->deskripsi }}</option>
+                                        <option value="{{ $item->id }}">#{{ $item->id }} - {{ $item->deskripsi }} (Sisa Rp {{ number_format($item->sisa_bayar, 0, ",", ".") }})</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -262,7 +262,8 @@
             });
             $('.select-piutang').select2({
                 theme: "bootstrap4",
-                placeholder: "Pilih Piutang",
+                placeholder: "Pilih piutang manual (opsional)",
+                allowClear: true,
             });
         });
 
@@ -271,19 +272,6 @@
         });
 
         $(document).ready(function() {
-            $('#id_kategori_transaksi').on('change', function() {
-                const selectedValue = $(this).val();
-
-                if (selectedValue == 12) {
-                    $('#row-hutang').show();
-                    $('#sisa_bayar').val('');
-                } else {
-                    $('#row-hutang').hide();
-                    $('#id_piutang').val('');
-                    $('#sisa_bayar').val('');
-                }
-            });
-
             $('#id_piutang').on('change', function() {
                 const idHutang = $(this).val();
 
@@ -394,12 +382,8 @@
                     const kategori = response.data.id_kategori_transaksi;
                     $('#id_kategori_transaksi').val(kategori).trigger('change');
 
-                    if (kategori == 12) {
-                        $('#id_kategori_transaksi').prop('disabled', false);
-                        $('#id_piutang').val(response.data.id_piutang).trigger('change');
-                    } else {
-                        $('#id_kategori_transaksi').prop('disabled', false);
-                    }
+                    $('#id_kategori_transaksi').prop('disabled', false);
+                    $('#id_piutang').val(response.data.id_piutang || '').trigger('change');
 
                     $('#id_piutang').prop('disabled', true);
 
@@ -444,7 +428,7 @@
             $('#primary_id').val('');
             $('#id_kategori_transaksi').val('').trigger('change');
             $('#id_bank').val('').trigger('change');
-            $('#id_piutang').val('').trigger('change');
+            $('#id_piutang').prop('disabled', false).val('').trigger('change');
             $('#id_kategori_transaksi').prop('disabled', false);
             $('.is-invalid').removeClass('is-invalid');
             $('.invalid-feedback').remove();
