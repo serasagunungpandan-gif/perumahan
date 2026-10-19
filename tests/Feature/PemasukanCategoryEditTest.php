@@ -42,5 +42,29 @@ class PemasukanCategoryEditTest extends TestCase
                 ->assertUnprocessable()->assertJsonValidationErrors('id_kategori_transaksi');
         }
         $this->assertDatabaseHas('pemasukan', ['id' => 1, 'id_kategori_transaksi' => 2]);
+
+        Schema::create('piutang', function (Blueprint $table) {
+            $table->id();
+            $table->integer('id_kategori_transaksi')->nullable();
+            $table->integer('nominal')->default(10000);
+            $table->integer('id_customer')->default(0);
+            $table->integer('terbayar')->default(0);
+            $table->integer('sisa_bayar')->default(10000);
+            $table->integer('status')->default(1);
+            $table->date('tgl_pelunasan')->nullable();
+        });
+        DB::table('piutang')->insert(['id' => 1, 'id_kategori_transaksi' => 1]);
+        DB::table('pemasukan')->where('id', 1)->update(['id_piutang' => 1]);
+
+        // A linked payment always takes its category from the receivable.
+        $this->putJson('/_test/pemasukan/1', array_replace($payload, ['id_kategori_transaksi' => 3]))
+            ->assertOk();
+        $this->assertDatabaseHas('pemasukan', ['id' => 1, 'id_kategori_transaksi' => 1]);
+        unset($payload['id_kategori_transaksi']);
+        $this->putJson('/_test/pemasukan/1', $payload)->assertOk();
+
+        DB::table('piutang')->where('id', 1)->update(['id_kategori_transaksi' => null]);
+        $this->putJson('/_test/pemasukan/1', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('id_piutang');
     }
 }

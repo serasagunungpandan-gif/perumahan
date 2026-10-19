@@ -23,7 +23,7 @@ class PemasukanController extends Controller
         $permissions = HakAksesController::getUserPermissions();
 
         if ($request->ajax()) {
-            $data = Pemasukan::with(['kategori'])->orderByDesc('tanggal');
+            $data = Pemasukan::with(['kategori', 'piutang'])->orderByDesc('tanggal');
 
             if ($request->filled('filter_tanggal')) {
                 $data->whereDate('tanggal', $request->filter_tanggal);
@@ -46,9 +46,12 @@ class PemasukanController extends Controller
                     return $bank ? $bank->nama : 'Bank Tidak Diketahui';
                 })
                 ->addColumn('id_kategori_transaksi', function ($row) {
-                    $kategori = KategoriTransaksi::find($row->id_kategori_transaksi);
-                    $nama     = $kategori ? $kategori->kategori : 'Tidak Diketahui';
-                    return $nama;
+                    $nama = e($row->kategori->kategori ?? 'Tidak Diketahui');
+                    $deskripsi = $row->piutang->deskripsi ?? '';
+
+                    return $deskripsi !== ''
+                        ? $nama . '<br><small class="text-muted">' . e($deskripsi) . '</small>'
+                        : $nama;
                 })
                 ->filter(function ($query) use ($request) {
                     if ($request->has('search') && $request->input('search.value') != '') {
@@ -60,6 +63,9 @@ class PemasukanController extends Controller
                         $query->where(function ($q) use ($bankIds, $kategoriIds, $search) {
                             $q->whereIn('id_bank', $bankIds)
                                 ->orWhereIn('id_kategori_transaksi', $kategoriIds)
+                                ->orWhereHas('piutang', function ($piutang) use ($search) {
+                                    $piutang->where('deskripsi', 'like', "%$search%");
+                                })
                                 ->orWhere('keterangan', 'like', "%$search%");
                         });
                     }
@@ -150,6 +156,10 @@ class PemasukanController extends Controller
 
     public function store(Request $request)
     {
+        if ($request->filled('id_piutang')) {
+            $request->validate(['id_piutang' => 'integer|min:1|exists:piutang,id']);
+            $request->merge(['id_kategori_transaksi' => $this->kategoriPiutang($request->id_piutang)]);
+        }
         abort_if(KategoriTransaksi::where('kategori', 'Pencairan KPR')->whereKey($request->id_kategori_transaksi)->exists(),
             422, 'Input pencairan KPR melalui detail pembayaran agar akad dan batas plafon diperiksa.');
         $request->validate([
@@ -158,7 +168,8 @@ class PemasukanController extends Controller
             'id_bank'               => 'required',
             'lampiran'              => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
             'id_kategori_transaksi' => 'required',
-            'id_piutang'            => 'nullable|integer|min:1|exists:piutang,id',
+            'jenis_pemasukan'       => 'nullable|in:lainnya,piutang',
+            'id_piutang'            => 'required_if:jenis_pemasukan,piutang|prohibited_if:jenis_pemasukan,lainnya|nullable|integer|min:1|exists:piutang,id',
         ], [
             'tanggal.required'               => 'Tanggal wajib diisi.',
             'tanggal.date'                   => 'Tanggal harus berupa tanggal.',
@@ -170,6 +181,7 @@ class PemasukanController extends Controller
             'lampiran.max'                   => 'Ukuran file maksimal 2MB.',
             'id_kategori_transaksi.required' => 'Kategori transaksi wajib dipilih.',
             'id_piutang.required_if'         => 'Piutang wajib dipilih',
+            'id_piutang.prohibited_if'       => 'Gunakan tombol Pelunasan Piutang untuk pembayaran piutang.',
         ]);
 
         if (! empty($request->id_piutang)) {
@@ -218,6 +230,9 @@ class PemasukanController extends Controller
     public function update(Request $request, $id)
     {
         $data = Pemasukan::findOrFail($id);
+        if ($data->id_piutang) {
+            $request->merge(['id_kategori_transaksi' => $this->kategoriPiutang($data->id_piutang)]);
+        }
         abort_if($data->plafon_sp3k !== null, 422, 'Pencairan KPR dikelola melalui detail pembayaran.');
 
         $rules = [
@@ -228,7 +243,9 @@ class PemasukanController extends Controller
 
         $rules['id_kategori_transaksi'] = [
             'required',
-            \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')->where('jenis_kategori', 'PEMASUKAN'),
+            $data->id_piutang
+                ? \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')
+                : \Illuminate\Validation\Rule::exists('kategori_transaksi', 'id')->where('jenis_kategori', 'PEMASUKAN'),
         ];
 
         if (empty($data->lampiran)) {
@@ -303,6 +320,19 @@ class PemasukanController extends Controller
         $this->logEdit('Pemasukan', $data->id);
 
         return response()->json(['status' => 'success']);
+    }
+
+    private function kategoriPiutang($id)
+    {
+        $piutang = Piutang::find($id);
+        if (! $piutang || ! $piutang->id_kategori_transaksi
+            || ! KategoriTransaksi::whereKey($piutang->id_kategori_transaksi)->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'id_piutang' => 'Kategori piutang belum tersedia. Lengkapi kategori pada data piutang terlebih dahulu.',
+            ]);
+        }
+
+        return $piutang->id_kategori_transaksi;
     }
 
     public function destroy($id)

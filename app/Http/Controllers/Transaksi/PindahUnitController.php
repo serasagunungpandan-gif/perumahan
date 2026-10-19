@@ -111,7 +111,7 @@ class PindahUnitController extends Controller
 
         $tanggalSekarang = Carbon::now('Asia/Jakarta')->format('Y-m-d');
         $metodeBayar     = MetodeBayar::all();
-        $kavBaru         = KavlingPeta::available()->orderBy('kode_kavling')->get();
+        $kavBaru         = KavlingPeta::with('lokasi')->available()->orderBy('kode_kavling')->get();
         $bankList        = Bank::all();
 
         return view(
@@ -186,7 +186,8 @@ class PindahUnitController extends Controller
                 'id_customer'       => $request->id_customer,
                 'id_kavling_lama'   => $customer->id_kavling,
                 'id_kavling_baru'   => $request->id_kavling_baru,
-                'nominal_utj'       => str_replace('.', '', $request->nominal_utj),
+                'nominal_utj'       => (int) (Pemasukan::where('id_customer', $customer->id)
+                    ->where('id_kategori_transaksi', 1)->value('nominal') ?? 0),
                 'biaya_admin'       => $biayaAdmin !== '' ? $biayaAdmin : 0,
                 'keterangan_pindah' => $request->keterangan_pindah ?? '',
                 'id_bank'           => $request->id_bank ?: 0,

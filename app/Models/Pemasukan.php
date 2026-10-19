@@ -25,6 +25,11 @@ class Pemasukan extends Model
         return $this->belongsTo(KategoriTransaksi::class, 'id_kategori_transaksi');
     }
 
+    public function piutang()
+    {
+        return $this->belongsTo(Piutang::class, 'id_piutang');
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'id_customer');

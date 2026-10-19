@@ -17,8 +17,12 @@
                                     <div class="d-flex align-items-center">
                                         @if (isset($permissions['tambah']) && $permissions['tambah'] == 1)
                                             <button type="button" class="btn btn-sm btn-primary" data-toggle="modal"
-                                                data-target="#modalForm">
-                                                <i class="fas fa-plus"></i> Tambah Pemasukan
+                                                data-target="#modalForm" data-jenis="lainnya">
+                                                <i class="fas fa-plus"></i> Pemasukan Lain-lain
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-success ml-2" data-toggle="modal"
+                                                data-target="#modalForm" data-jenis="piutang">
+                                                <i class="fas fa-plus"></i> Pelunasan Piutang
                                             </button>
                                         @endif
                                     </div>
@@ -68,6 +72,7 @@
                 <form id="formData" enctype="multipart/form-data">
                     @csrf
                     <input type="hidden" id="primary_id" name="primary_id">
+                    <input type="hidden" id="jenis_pemasukan" name="jenis_pemasukan">
                     <div class="modal-body">
                         <div class="form-group row">
                             <label for="tanggal" class="col-sm-3 col-form-label">Tanggal Pemasukan</label>
@@ -262,13 +267,19 @@
             });
             $('.select-piutang').select2({
                 theme: "bootstrap4",
-                placeholder: "Pilih piutang manual (opsional)",
+                placeholder: "Pilih Piutang",
                 allowClear: true,
             });
         });
 
         $(document).on('click', '[data-target="#modalForm"]', function() {
-            $('#modalFormLabel').text('Tambah Pemasukan');
+            const isPiutang = $(this).data('jenis') === 'piutang';
+            $('#modalFormLabel').text(isPiutang ? 'Pemasukan Pelunasan Piutang' : 'Pemasukan Lain-lain');
+            $('#jenis_pemasukan').val(isPiutang ? 'piutang' : 'lainnya');
+            $('#row-hutang').toggle(isPiutang);
+            $('#id_kategori_transaksi').closest('.form-group').toggle(!isPiutang);
+            $('#id_kategori_transaksi').prop('disabled', isPiutang).val('').trigger('change');
+            $('#id_piutang').prop('disabled', !isPiutang).prop('required', isPiutang).val('').trigger('change');
         });
 
         $(document).ready(function() {
@@ -364,6 +375,9 @@
             $.get(url, function(response) {
                 if (response.status === 'success') {
                     $('#modalFormLabel').text('Edit Pemasukan');
+                    $('#jenis_pemasukan').val('');
+                    $('#row-hutang').toggle(!!Number(response.data.id_piutang));
+                    $('#id_piutang').prop('required', false);
                     $('#primary_id').val(response.data.id);
                     $('#tanggal').val(response.data.tanggal);
                     $('#keterangan').val(response.data.keterangan);
@@ -382,7 +396,9 @@
                     const kategori = response.data.id_kategori_transaksi;
                     $('#id_kategori_transaksi').val(kategori).trigger('change');
 
-                    $('#id_kategori_transaksi').prop('disabled', false);
+                    const isPiutang = !!Number(response.data.id_piutang);
+                    $('#id_kategori_transaksi').closest('.form-group').toggle(!isPiutang);
+                    $('#id_kategori_transaksi').prop('disabled', isPiutang);
                     $('#id_piutang').val(response.data.id_piutang || '').trigger('change');
 
                     $('#id_piutang').prop('disabled', true);

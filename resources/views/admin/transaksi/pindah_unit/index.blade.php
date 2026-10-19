@@ -107,33 +107,34 @@
                         </div>
 
                         <div class="form-group row">
-                            <label for="kavling" class="col-md-3 col-form-label">Lokasi Unit Lama</label>
+                            <label for="lokasi_lama" class="col-md-3 col-form-label">Lokasi Unit Lama</label>
                             <div class="col-md-4">
-                                <input name="id_kavling_lama" id="id_kavling_lama" class="form-control" type="text"
-                                    readonly>
+                                <input id="lokasi_lama" class="form-control" type="text" readonly>
                             </div>
-                            <label for="nominal_utj" class="col-md-2 col-form-label">Nominal UTJ</label>
+                        </div>
+                        <div class="form-group row">
+                            <label for="id_kavling_lama" class="col-md-3 col-form-label">Kode Kavling Lama</label>
                             <div class="col-md-3">
-                                <div class="input-group">
-                                    <div class="input-group-prepend">
-                                        <span class="input-group-text">Rp.</span>
-                                    </div>
-                                    <input name="nominal_utj" id="nominal_utj" class="form-control format-number"
-                                        type="text" readonly>
-                                </div>
+                                <input id="id_kavling_lama" class="form-control" type="text" readonly>
                             </div>
                         </div>
 
                         <div class="form-group row">
                             <label class="col-sm-3 col-form-label">Lokasi Unit Baru</label>
                             <div class="col-sm-4">
+                                <select id="lokasi_baru" class="form-control">
+                                    <option value="">Pilih Lokasi</option>
+                                    @foreach ($kavBaru->pluck('lokasi')->filter()->unique('id') as $lokasi)
+                                        <option value="{{ $lokasi->id }}">{{ $lokasi->nama_kavling }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="id_kavling_baru" class="col-sm-3 col-form-label">Kode Kavling Baru</label>
+                            <div class="col-sm-4">
                                 <select id="id_kavling_baru" class="form-control select-kavling" name="id_kavling_baru">
                                     <option value=""></option>
-                                    @foreach ($kavBaru as $kav)
-                                        <option value="{{ $kav->id }}">
-                                            {{ $kav->kode_kavling }}
-                                        </option>
-                                    @endforeach
                                 </select>
                             </div>
                         </div>
@@ -218,6 +219,19 @@
         previewFile('lampiran_bukti', 'previewBuktiBayar');
 
         $(document).ready(function() {
+            const kavlingTersedia = @json($kavBaru->map(fn ($kav) => ['id' => $kav->id, 'id_lokasi' => $kav->id_lokasi, 'kode' => $kav->kode_kavling])->values());
+            $('#lokasi_baru').select2({
+                theme: 'bootstrap4',
+                placeholder: 'Pilih Lokasi',
+            }).on('change', function() {
+                const lokasiId = $(this).val();
+                const kavlingSelect = $('#id_kavling_baru');
+                kavlingSelect.empty().append(new Option('', ''));
+                kavlingTersedia.filter(kav => String(kav.id_lokasi) === lokasiId).forEach(kav => {
+                    kavlingSelect.append(new Option(kav.kode, kav.id));
+                });
+                kavlingSelect.val('').prop('disabled', !lokasiId).trigger('change');
+            }).trigger('change');
             $('.select-customer').select2({
                 theme: "bootstrap4",
                 placeholder: "Pilih Customer",
@@ -325,15 +339,8 @@
                             $('#nik').val(customer.nik ?? '');
                             $('#alamat_ktp').val(customer.alamat_ktp ?? '');
 
-                            let lokasi = '-';
-                            if (customer.lokasi && customer.kavling) {
-                                lokasi = customer.lokasi.nama_kavling + ' - ' + customer.kavling
-                                    .kode_kavling;
-                            }
-
-                            $('#id_kavling_lama').val(lokasi);
-
-                            $('#nominal_utj').val(formatNumber(res.utj));
+                            $('#lokasi_lama').val(customer.lokasi?.nama_kavling ?? '-');
+                            $('#id_kavling_lama').val(customer.kavling?.kode_kavling ?? '-');
                         }
                     },
                     error: function() {
@@ -346,7 +353,7 @@
                 $('#nik').val('');
                 $('#alamat_ktp').val('');
                 $('#id_kavling_lama').val('');
-                $('#nominal_utj').val('');
+                $('#lokasi_lama').val('');
             }
         });
 
@@ -357,6 +364,7 @@
 
             $('#primary_id').val('');
             $('#id_customer').val('').trigger('change');
+            $('#lokasi_baru').val('').trigger('change');
 
             let submitBtn = $('#submitBtn');
             let spinner = submitBtn.find('.spinner-border');
@@ -403,6 +411,7 @@
                 data: formData,
                 contentType: false,
                 processData: false,
+                dataType: 'json',
                 success: function(response) {
                     $('#modalForm').modal('hide');
                     audio.play();
@@ -424,7 +433,7 @@
                             positionClass: "toast-bottom-right",
                         });
 
-                        let errors = xhr.responseJSON.errors;
+                        let errors = xhr.responseJSON?.errors ?? {};
                         $.each(errors, function(key, val) {
                             let input = $('#' + key);
                             input.addClass('is-invalid');
@@ -435,10 +444,24 @@
                             );
                         });
 
-                        spinner.addClass('d-none');
-                        btnText.text('Simpan');
-                        submitBtn.prop('disabled', false);
+                        if (!Object.keys(errors).length) {
+                            toastr.error(xhr.responseJSON?.message || 'Data tidak dapat disimpan.', 'GAGAL!');
+                        }
+                    } else {
+                        const message = xhr.status === 419
+                            ? 'Sesi telah berakhir. Muat ulang halaman lalu coba kembali.'
+                            : 'Gagal menyimpan Pindah Unit. Silakan coba kembali.';
+                        toastr.error(message, 'GAGAL!', {
+                            progressBar: true,
+                            timeOut: 5000,
+                            positionClass: 'toast-bottom-right',
+                        });
                     }
+                },
+                complete: function() {
+                    spinner.addClass('d-none');
+                    btnText.text('Simpan');
+                    submitBtn.prop('disabled', false);
                 }
             });
         });
